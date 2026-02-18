@@ -1,6 +1,8 @@
 //Rand
 import 'package:flutter/material.dart';
 import '../widgets/login_signup_background.dart'; // تأكد من المسار الصحيح لديك
+import 'package:flutter/gestures.dart';
+import '../screens/signup_page.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -62,7 +64,7 @@ class LoginPage extends StatelessWidget {
                 RichText(
                   textAlign: TextAlign.center,
                   text: TextSpan(
-                    style: const TextStyle(fontSize: 13, fontFamily: 'Cairo'), // أضف نوع الخط المستخدم في مشروعك
+                    style: const TextStyle(fontSize: 13, fontFamily: 'Cairo'),
                     children: [
                       const TextSpan(
                         text: "ليس لديك حساب ؟ ",
@@ -73,10 +75,16 @@ class LoginPage extends StatelessWidget {
                         style: const TextStyle(
                           color: Color(0xFFD2B4EC),
                           fontWeight: FontWeight.w700,
-                          decoration: TextDecoration.underline, // اختياري: إضافة خط تحت النص ليظهر كرابط
+                          decoration: TextDecoration.underline,
                         ),
-                        // هنا يمكنك إضافة التعليق البرمجي للانتقال لصفحة التسجيل لاحقاً
-                        // recognizer: TapGestureRecognizer()..onTap = () => print('الانتقال للتسجيل'),
+                        // إضافة التعرف على اللمس هنا
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const SignUpPage()),
+                            );
+                          },
                       ),
                     ],
                   ),
