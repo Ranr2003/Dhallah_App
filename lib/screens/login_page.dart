@@ -1,78 +1,102 @@
 //Rand
 import 'package:flutter/material.dart';
+import '../widgets/login_signup_background.dart'; // تأكد من المسار الصحيح لديك
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 1. الخلفية المتدرجة والمنحنيات الطبقية برمجياً
-          Positioned.fill(
-            child: CustomPaint(
-              painter: BackgroundPainter(),
+    return LoginSignupBackground(
+      child: Center(
+        child: SingleChildScrollView(
+          child: Container(
+            width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.85,
+            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 35),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(35),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFD2B4EC).withValues(alpha: 0.15),
+                  blurRadius: 30,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // الشعار
+                Image.asset(
+                  'assets/images/logo.jpeg', // تأكد من إضافة اللوجو في ملف assets
+                  height: 80,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 15),
+
+                // العنوان والترحيب
+                const Text(
+                  "تسجيل الدخول",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF444444)),
+                ),
+                const Text(
+                  "! هلابك من جديد ",
+                  style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 30),
+
+                // الحقول
+                _buildField("البريد الإلكتروني"),
+                const SizedBox(height: 18),
+                _buildField("كلمة السر", isPass: true),
+
+                const SizedBox(height: 30),
+
+                // زر الدخول المحدث بالتدرج الصحيح
+                _buildLoginButton(),
+
+                const SizedBox(height: 20),
+
+                // الروابط الإضافية (ليس لديك حساب؟)
+                RichText(
+                  textAlign: TextAlign.center,
+                  text: TextSpan(
+                    style: const TextStyle(fontSize: 13, fontFamily: 'Cairo'), // أضف نوع الخط المستخدم في مشروعك
+                    children: [
+                      const TextSpan(
+                        text: "ليس لديك حساب ؟ ",
+                        style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                      ),
+                      TextSpan(
+                        text: "قم بتسجيل حساب جديد",
+                        style: const TextStyle(
+                          color: Color(0xFFD2B4EC),
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline, // اختياري: إضافة خط تحت النص ليظهر كرابط
+                        ),
+                        // هنا يمكنك إضافة التعليق البرمجي للانتقال لصفحة التسجيل لاحقاً
+                        // recognizer: TapGestureRecognizer()..onTap = () => print('الانتقال للتسجيل'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  "نسيت كلمة السر؟",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFFD2B4EC), fontSize: 13, fontWeight: FontWeight.w600,decoration: TextDecoration.underline),
+                ),
+
+                // const SizedBox(height: 30),
+                // const Text(
+                //   "dhallah.com",
+                //   style: TextStyle(color: Colors.grey, fontSize: 12, letterSpacing: 1.1),
+                // ),
+              ],
             ),
           ),
-
-          // 2. محتوى الصفحة (المربع الأبيض)
-          Center(
-            child: SingleChildScrollView(
-              child: Container(
-                width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.85,
-                padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 40),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(35),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFD2B4EC).withValues(alpha: 0.2),
-                      blurRadius: 25,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // الشعار الخاص بك
-                    Image.asset(
-                      'assets/images/logo.jpeg',
-                      height: 90,
-                      fit: BoxFit.contain,
-                      errorBuilder: (context, error, stackTrace) =>
-                      const Icon(Icons.image_not_supported, size: 50, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      "تسجيل الدخول",
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF444444)),
-                    ),
-                    const Text(
-                      "هلابك من جديد!",
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 35),
-
-                    _buildField("البريد الإلكتروني"),
-                    const SizedBox(height: 20),
-                    _buildField("كلمة السر", isPass: true),
-
-                    const SizedBox(height: 35),
-                    _buildLoginButton(),
-
-                    const SizedBox(height: 25),
-                    const Text(
-                      "dhallah.com",
-                      style: TextStyle(color: Color(0xFFD2B4EC), fontSize: 13, fontWeight: FontWeight.w500),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -81,22 +105,24 @@ class LoginPage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.only(right: 5, bottom: 8),
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xFF444444))),
+        ),
         TextField(
           obscureText: isPass,
           textAlign: TextAlign.right,
           decoration: InputDecoration(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             filled: true,
             fillColor: const Color(0xFFFBF9FF),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide.none,
-            ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(15),
-              borderSide: BorderSide(color: const Color(0xFFD2B4EC).withValues(alpha: 0.1)),
+              borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(15),
+              borderSide: const BorderSide(color: Color(0xFFD2B4EC), width: 1.5),
             ),
           ),
         ),
@@ -110,9 +136,12 @@ class LoginPage extends StatelessWidget {
       height: 55,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
+          // التدرج من اليمين (أفتح) إلى اليسار (أغمق) حسب طلبك
+          begin: Alignment.centerRight,
+          end: Alignment.centerLeft,
           colors: [
-            Color(0xFFE9D7F7),
-            Color(0xFFD2B4EC),
+            Color(0xFFE9D7F7), // الدرجة الفاتحة يمين
+            Color(0xFFD2B4EC), // الدرجة الأغمق يسار
           ],
         ),
         borderRadius: BorderRadius.circular(30),
@@ -132,69 +161,4 @@ class LoginPage extends StatelessWidget {
       ),
     );
   }
-}
-
-class BackgroundPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-    final Rect rect = Offset.zero & size;
-
-    final Gradient bgGradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Colors.white,
-        const Color(0xFFD2B4EC).withValues(alpha: 0.08),
-      ],
-    );
-    paint.shader = bgGradient.createShader(rect);
-    canvas.drawRect(rect, paint);
-    paint.shader = null;
-
-    _drawTopWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.3), 0.10);
-    _drawTopWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.15), 0.07);
-
-    paint.style = PaintingStyle.stroke;
-    paint.strokeWidth = 0.4;
-    for (var i = 0; i < 6; i++) {
-      paint.color = const Color(0xFFD2B4EC).withValues(alpha: 0.05 + (i * 0.02));
-      var path = Path();
-      path.moveTo(0, size.height * (0.25 + i * 0.03));
-      path.cubicTo(
-          size.width * 0.3, size.height * (0.15 + i * 0.04),
-          size.width * 0.7, size.height * (0.55 - i * 0.04),
-          size.width, size.height * (0.35 + i * 0.03)
-      );
-      canvas.drawPath(path, paint);
-    }
-
-    paint.style = PaintingStyle.fill;
-    _drawBottomWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.25), 0.10);
-    _drawBottomWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.12), 0.06);
-  }
-
-  void _drawTopWave(Canvas canvas, Size size, Color color, double hFactor) {
-    final paint = Paint()..color = color;
-    var path = Path();
-    path.lineTo(0, size.height * hFactor);
-    path.quadraticBezierTo(size.width * 0.5, size.height * (hFactor + 0.04), size.width, size.height * (hFactor - 0.02));
-    path.lineTo(size.width, 0);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawBottomWave(Canvas canvas, Size size, Color color, double hFactor) {
-    final paint = Paint()..color = color;
-    var path = Path();
-    path.moveTo(0, size.height);
-    path.lineTo(0, size.height * (1 - hFactor));
-    path.quadraticBezierTo(size.width * 0.5, size.height * (1 - hFactor - 0.04), size.width, size.height * (1 - hFactor + 0.02));
-    path.lineTo(size.width, size.height);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
