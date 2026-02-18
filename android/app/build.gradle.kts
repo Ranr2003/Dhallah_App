@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.dhallahapp"
+    namespace = "com.example.dhallah_app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -31,6 +31,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true // أضف هذا السطر
     }
 
     buildTypes {
