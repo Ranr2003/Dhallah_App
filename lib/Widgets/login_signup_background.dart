@@ -1,22 +1,22 @@
 import 'package:flutter/material.dart';
 
 class LoginSignupBackground extends StatelessWidget {
-  final Widget child; // هذا المتغير سيسمح لنا بوضع محتويات الشاشة فوق الخلفية
+  final Widget child;
 
   const LoginSignupBackground({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // استخدمت Color(0xFFDDC5F4).withValues(alpha: 0.1) كخلفية باهتة جداً للملأ
+      backgroundColor: const Color(0xFFFBF8FF),
       body: Stack(
         children: [
-          // الرسم الخاص بالخلفية
           Positioned.fill(
             child: CustomPaint(
               painter: BackgroundPainter(),
             ),
           ),
-          // المحتوى الذي سيتم تمريره (المربع الأبيض وغيره)
           SafeArea(child: child),
         ],
       ),
@@ -24,66 +24,52 @@ class LoginSignupBackground extends StatelessWidget {
   }
 }
 
-// كود الرسم (BackgroundPainter) يبقى كما هو لكن معزول هنا
 class BackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-    final Rect rect = Offset.zero & size;
+    final paint = Paint()..style = PaintingStyle.fill;
 
-    final Gradient bgGradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Colors.white,
-        const Color(0xFFD2B4EC).withValues(alpha: 0.08),
-      ],
-    );
-    paint.shader = bgGradient.createShader(rect);
-    canvas.drawRect(rect, paint);
-    paint.shader = null;
+    // --- الموجات العلوية ---
 
-    _drawTopWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.3), 0.10);
-    _drawTopWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.15), 0.07);
+    // الطبقة الأغمق خلفاً (#B293CD)
+    paint.color = const Color(0xFFB293CD).withValues(alpha: 0.4);
+    var path1 = Path();
+    path1.moveTo(0, 0);
+    path1.lineTo(size.width * 0.8, 0);
+    path1.quadraticBezierTo(size.width * 0.4, size.height * 0.12, 0, size.height * 0.08);
+    path1.close();
+    canvas.drawPath(path1, paint);
 
-    paint.style = PaintingStyle.stroke;
-    paint.strokeWidth = 0.4;
-    for (var i = 0; i < 6; i++) {
-      paint.color = const Color(0xFFD2B4EC).withValues(alpha: 0.05 + (i * 0.02));
-      var path = Path();
-      path.moveTo(0, size.height * (0.25 + i * 0.03));
-      path.cubicTo(
-          size.width * 0.3, size.height * (0.15 + i * 0.04),
-          size.width * 0.7, size.height * (0.55 - i * 0.04),
-          size.width, size.height * (0.35 + i * 0.03)
-      );
-      canvas.drawPath(path, paint);
-    }
+    // الطبقة الأساسية (#C0A2DB)
+    paint.color = const Color(0xFFC0A2DB).withValues(alpha: 0.7);
+    var path2 = Path();
+    path2.moveTo(0, 0);
+    path2.lineTo(size.width, 0);
+    path2.quadraticBezierTo(size.width * 0.7, size.height * 0.15, 0, size.height * 0.05);
+    path2.close();
+    canvas.drawPath(path2, paint);
 
-    paint.style = PaintingStyle.fill;
-    _drawBottomWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.25), 0.10);
-    _drawBottomWave(canvas, size, const Color(0xFFD2B4EC).withValues(alpha: 0.12), 0.06);
-  }
+    // --- الموجات السفلية (كما في الصورة المرفقة) ---
 
-  void _drawTopWave(Canvas canvas, Size size, Color color, double hFactor) {
-    final paint = Paint()..color = color;
-    var path = Path();
-    path.lineTo(0, size.height * hFactor);
-    path.quadraticBezierTo(size.width * 0.5, size.height * (hFactor + 0.04), size.width, size.height * (hFactor - 0.02));
-    path.lineTo(size.width, 0);
-    path.close();
-    canvas.drawPath(path, paint);
-  }
+    // الطبقة الفاتحة (#DDC5F4)
+    paint.color = const Color(0xFFDDC5F4).withValues(alpha: 0.6);
+    var pathBottom1 = Path();
+    pathBottom1.moveTo(0, size.height);
+    pathBottom1.lineTo(size.width, size.height);
+    pathBottom1.lineTo(size.width, size.height * 0.82);
+    pathBottom1.quadraticBezierTo(size.width * 0.5, size.height * 0.88, 0, size.height * 0.98);
+    pathBottom1.close();
+    canvas.drawPath(pathBottom1, paint);
 
-  void _drawBottomWave(Canvas canvas, Size size, Color color, double hFactor) {
-    final paint = Paint()..color = color;
-    var path = Path();
-    path.moveTo(0, size.height);
-    path.lineTo(0, size.height * (1 - hFactor));
-    path.quadraticBezierTo(size.width * 0.5, size.height * (1 - hFactor - 0.04), size.width, size.height * (1 - hFactor + 0.02));
-    path.lineTo(size.width, size.height);
-    path.close();
-    canvas.drawPath(path, paint);
+    // الطبقة الوسطى (#C0A2DB)
+    paint.color = const Color(0xFFC0A2DB).withValues(alpha: 0.5);
+    var pathBottom2 = Path();
+    pathBottom2.moveTo(0, size.height);
+    pathBottom2.lineTo(size.width, size.height);
+    pathBottom2.lineTo(size.width, size.height * 0.92);
+    pathBottom2.quadraticBezierTo(size.width * 0.4, size.height * 0.95, 0, size.height * 0.85);
+    pathBottom2.close();
+    canvas.drawPath(pathBottom2, paint);
   }
 
   @override

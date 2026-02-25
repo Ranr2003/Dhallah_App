@@ -64,6 +64,9 @@ flutter:
 
     - assets/images/logo.jpeg
     - assets/images/df_Avtar.png
+    - resourses/DallahAppLogo.jpg
+    - resourses/DallahAppLogo2.png
+    - resourses/DhallahBG.jpg
 
   # To add assets to your application, add an assets section, like this:
   # assets:

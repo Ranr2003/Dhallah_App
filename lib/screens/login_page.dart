@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../widgets/login_signup_background.dart';
 import 'package:flutter/gestures.dart';
 import '../screens/signup_page.dart';
+import '../screens/ForgotPassword_page.dart';
 // استيراد السيرفس الخاصة بك
 
 class LoginPage extends StatefulWidget {
@@ -155,11 +156,25 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  "نسيت كلمة السر؟",
+                RichText(
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFFD2B4EC), fontSize: 13, fontWeight: FontWeight.w600, decoration: TextDecoration.underline),
-                ),
+                  text: TextSpan(
+                    text: "نسيت كلمة السر؟",
+                    style: const TextStyle(
+                      color: Color(0xFFD2B4EC),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
+                    ),
+                    recognizer: TapGestureRecognizer()
+                      ..onTap = () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                        );
+                      },
+                  ),
+                )
               ],
             ),
           ),
