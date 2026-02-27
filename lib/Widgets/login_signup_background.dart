@@ -1,177 +1,1 @@
-import 'package:flutter/material.dart';
-
-class LoginSignupBackground extends StatelessWidget {
-  final Widget child;
-  const LoginSignupBackground({super.key, required this.child});
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-// استخدمت Color(0xFFDDC5F4).withValues(alpha: 0.1) كخلفية باهتة جداً للملأ
-      backgroundColor: const Color(0xFFFBF8FF),
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: BackgroundPainter(),
-            ),
-          ),
-          SafeArea(child: child),
-        ],
-      ),
-    );
-  }
-}
-
-class BackgroundPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..style = PaintingStyle.fill;
-// --- الموجات العلوية ---
-// الطبقة الأغمق خلفاً (#B293CD)
-    paint.color = const Color(0xFFB293CD).withValues(alpha: 0.4);
-    var path1 = Path();
-    path1.moveTo(0, 0);
-    path1.lineTo(size.width * 0.8, 0);
-    path1.quadraticBezierTo(size.width * 0.4, size.height * 0.12, 0, size.height * 0.08);
-    path1.close();
-    canvas.drawPath(path1, paint);
-// الطبقة الأساسية (#C0A2DB)
-    paint.color = const Color(0xFFC0A2DB).withValues(alpha: 0.7);
-    var path2 = Path();
-    path2.moveTo(0, 0);
-    path2.lineTo(size.width, 0);
-    path2.quadraticBezierTo(size.width * 0.7, size.height * 0.15, 0, size.height * 0.05);
-    path2.close();
-    canvas.drawPath(path2, paint);
-// --- الموجات السفلية (كما في الصورة المرفقة) ---
-// الطبقة الفاتحة (#DDC5F4)
-    paint.color = const Color(0xFFDDC5F4).withValues(alpha: 0.6);
-    var pathBottom1 = Path();
-    pathBottom1.moveTo(0, size.height);
-    pathBottom1.lineTo(size.width, size.height);
-    pathBottom1.lineTo(size.width, size.height * 0.82);
-    pathBottom1.quadraticBezierTo(size.width * 0.5, size.height * 0.88, 0, size.height * 0.98);
-    pathBottom1.close();
-    canvas.drawPath(pathBottom1, paint);
-// الطبقة الوسطى (#C0A2DB)
-    paint.color = const Color(0xFFC0A2DB).withValues(alpha: 0.5);
-    var pathBottom2 = Path();
-    pathBottom2.moveTo(0, size.height);
-    pathBottom2.lineTo(size.width, size.height);
-    pathBottom2.lineTo(size.width, size.height * 0.92);
-    pathBottom2.quadraticBezierTo(size.width * 0.4, size.height * 0.95, 0, size.height * 0.85);
-    pathBottom2.close();
-    canvas.drawPath(pathBottom2, paint);
-  }
-  @override
-  bool shouldRepaint(CustomPainter oldDelegate) => false;
-}
-
-// import 'package:flutter/material.dart';
-// class LoginSignupBackground extends StatelessWidget {
-//   final Widget child;
-// const LoginSignupBackground(
-//     {
-//       super.key,
-//       required this.child
-//     }
-//     );
-// @override
-// Widget build(BuildContext context) {
-//   return Scaffold( backgroundColor: const Color(0xFFFBF8FF),
-//     body: Stack(
-//       children: [ Positioned.fill( child: CustomPaint( painter: BackgroundPainter(),
-//       ),
-//       ),
-//         SafeArea(child: child),
-//       ],
-//     ),
-//   );
-// }
-// }
-// class BackgroundPainter extends CustomPainter {
-//   @override
-//   void paint(Canvas canvas, Size size) {
-//     final paint = Paint()..style = PaintingStyle.fill;
-// // --- 1. المثلث الخلفي (المعلم بالأخضر) ---
-// // الوصف: يبدأ بموفي من اليسار، وعند الربع الثالث يبدأ يتداخل بالأبيض لينتهي أبيض تماماً
-//     final Rect rect1 = Rect.fromLTWH(0, 0, size.width, size.height * 0.35);    paint.shader = LinearGradient(
-//   begin: Alignment.centerLeft,
-//   end: Alignment.centerRight,
-//   colors: [
-//     //   const Color(0xFF7A3FB8), // موفي غامق من اليسار
-//     //   const Color(0xFFB293CD), // موفي أفتح
-//     //   const Color(0xFFE8DDF4), // فاتح جداً
-//     //   Colors.white,            // أبيض عند الرأس
-//     // ],
-//     // stops: const [
-//     //   0.0,   // بداية غامقة
-//     //   0.45,  // انتقال للموفي الفاتح
-//     //   0.75,  // قرب الأبيض
-//     //   1.0,   // أبيض كامل
-//     // ],
-//     Colors.white,            // يبدأ أبيض
-//     const Color(0xFFE8DDF4), // أبيض مائل للموفي
-//     const Color(0xFFB293CD), // موفي فاتح
-//     // const Color(0xFF7A3FB8), // موفي أوضح عند الرأس
-//   ],
-//   stops: const [
-//     0.0,   // أبيض
-//     0.03,  // بداية دخول الموّفي
-//     // 0.7,   // موفي فاتح
-//     1.0,   // موفي أوضح عند الرأس
-//   ],
-// ).createShader(rect1);
-//
-// var path1 = Path();
-// path1.moveTo(0, 0);
-// path1.lineTo(size.width * 0.8, 0);
-// // انحناء "قوس المطر" (مقوس للأسفل)
-// // نضع نقطة التحكم (Control Point) في الأعلى ليصبح الانحناء لأسفل
-// path1.quadraticBezierTo(
-//     size.width * 0.4, size.height * 0.15, 0, size.height * 0.25);
-// path1.close();
-// canvas.drawPath(path1, paint);
-//
-// // --- 2. المثلث الأمامي (المعلم بالأحمر) ---
-// // الوصف: يبدأ أبيض من اليسار (القاعدة) وينتهي بموفي تماماً عند الرأس (اليمين)
-// final Rect rect2 = Rect.fromLTWH(0, 0, size.width, size.height * 0.28);    paint.shader = LinearGradient(
-//   begin: Alignment.centerLeft,
-//   end: Alignment.centerRight,
-//   colors: [
-//     //   Colors.white,            // يبدأ أبيض
-//     //   const Color(0xFFE8DDF4), // أبيض مائل للموفي
-//     //   const Color(0xFFB293CD), // موفي فاتح
-//     //   const Color(0xFF7A3FB8), // موفي أوضح عند الرأس
-//     // ],
-//     // stops: const [
-//     //   0.0,   // أبيض
-//     //   0.35,  // بداية دخول الموّفي
-//     //   0.7,   // موفي فاتح
-//     //   1.0,   // موفي أوضح عند الرأس
-//     // ],
-//     //   const Color(0xFF7A3FB8), // موفي غامق من اليسار
-//     const Color(0xFFB293CD), // موفي أفتح
-//     const Color(0xFFE8DDF4), // فاتح جداً
-//     Colors.white,            // أبيض عند الرأس
-//   ],
-//   stops: const [
-//     0.0,   // بداية غامقة
-//     // 0.45,  // انتقال للموفي الفاتح
-//     0.75,  // قرب الأبيض
-//     1.0,   // أبيض كامل
-//   ],
-// ).createShader(rect2);
-//
-// var path2 = Path();
-// path2.moveTo(0, 0);
-// path2.lineTo(size.width * 0.55, 0);
-// // انحناء "قوس المطر" للمثلث الأمامي (أقل عمقاً ليبرز المثلث الذي خلفه)
-// path2.quadraticBezierTo(
-//     size.width * 0.25, size.height * 0.08, 0, size.height * 0.15);
-// path2.close();
-// canvas.drawPath(path2, paint);
-// }
-// @override
-// bool shouldRepaint(CustomPainter oldDelegate) => false;
-//}
+// import 'package:flutter/material.dart';//// class LoginSignupBackground extends StatelessWidget {//   final Widget child;//   const LoginSignupBackground({super.key, required this.child});//   @override//   Widget build(BuildContext context) {//     return Scaffold(// // استخدمت Color(0xFFDDC5F4).withValues(alpha: 0.1) كخلفية باهتة جداً للملأ//       backgroundColor: const Color(0xFFFBF8FF),//       body: Stack(//         children: [//           Positioned.fill(//             child: CustomPaint(//               painter: BackgroundPainter(),//             ),//           ),//           SafeArea(child: child),//         ],//       ),//     );//   }// }//// class BackgroundPainter extends CustomPainter {//   @override//   void paint(Canvas canvas, Size size) {//     final paint = Paint()..style = PaintingStyle.fill;// // --- الموجات العلوية ---// // الطبقة الأغمق خلفاً (#B293CD)//     paint.color = const Color(0xFFB293CD).withValues(alpha: 0.4);//     var path1 = Path();//     path1.moveTo(0, 0);//     path1.lineTo(size.width * 0.8, 0);//     path1.quadraticBezierTo(size.width * 0.4, size.height * 0.12, 0, size.height * 0.08);//     path1.close();//     canvas.drawPath(path1, paint);// // الطبقة الأساسية (#C0A2DB)//     paint.color = const Color(0xFFC0A2DB).withValues(alpha: 0.7);//     var path2 = Path();//     path2.moveTo(0, 0);//     path2.lineTo(size.width, 0);//     path2.quadraticBezierTo(size.width * 0.7, size.height * 0.15, 0, size.height * 0.05);//     path2.close();//     canvas.drawPath(path2, paint);// // --- الموجات السفلية (كما في الصورة المرفقة) ---// // الطبقة الفاتحة (#DDC5F4)//     paint.color = const Color(0xFFDDC5F4).withValues(alpha: 0.6);//     var pathBottom1 = Path();//     pathBottom1.moveTo(0, size.height);//     pathBottom1.lineTo(size.width, size.height);//     pathBottom1.lineTo(size.width, size.height * 0.82);//     pathBottom1.quadraticBezierTo(size.width * 0.5, size.height * 0.88, 0, size.height * 0.98);//     pathBottom1.close();//     canvas.drawPath(pathBottom1, paint);// // الطبقة الوسطى (#C0A2DB)//     paint.color = const Color(0xFFC0A2DB).withValues(alpha: 0.5);//     var pathBottom2 = Path();//     pathBottom2.moveTo(0, size.height);//     pathBottom2.lineTo(size.width, size.height);//     pathBottom2.lineTo(size.width, size.height * 0.92);//     pathBottom2.quadraticBezierTo(size.width * 0.4, size.height * 0.95, 0, size.height * 0.85);//     pathBottom2.close();//     canvas.drawPath(pathBottom2, paint);//   }//   @override//   bool shouldRepaint(CustomPainter oldDelegate) => false;// }import 'package:flutter/material.dart';class LoginSignupBackground extends StatelessWidget {  final Widget child;  const LoginSignupBackground({super.key, required this.child});  @override  Widget build(BuildContext context) {    return Scaffold(      backgroundColor: const Color(0xFFFBF8FF),      body: Stack(        children: [          Positioned.fill(            child: CustomPaint(              painter: BackgroundPainter(),            ),          ),          SafeArea(child: child),        ],      ),    );  }}class BackgroundPainter extends CustomPainter {  @override  void paint(Canvas canvas, Size size) {    final paint = Paint()..style = PaintingStyle.fill;    // --- 1. الأشكال في الجهة اليسرى (كودك الأصلي بدون تغيير) ---    _drawBottomWaves(canvas, size, paint);    // --- 2. الأشكال في الجهة اليمنى (الإضافة الجديدة لمحاكاة النموذج) ---    // التقوس العلوي الأيمن (خلفي)    final Rect rectRight1 = Rect.fromLTWH(size.width * 0.5, 0, size.width * 0.9, size.height * 0.25);    paint.shader = LinearGradient(      begin: Alignment.centerLeft,      end: Alignment.centerRight,      colors: [        const Color(0xFFB293CD),// أفتح قليلاً للتداخل        const Color(0xFFE8DDF4),      ],    ).createShader(rectRight1);    var pathRight1 = Path();    pathRight1.moveTo(size.width, 0);    pathRight1.lineTo(size.width * 0.2, 0); // يمتد لليسار ليتداخل مع الأقواس الأخرى    pathRight1.quadraticBezierTo(size.width * 0.7,size.height * 0.01,size.width, size.height * 0.07);    pathRight1.close();    canvas.drawPath(pathRight1, paint);    // التقوس العلوي الأيمن (أمامي - الأغمق)    paint.shader = LinearGradient(      begin: Alignment.centerRight,      end: Alignment.centerLeft,      colors: [        const Color(0xFFB293CD),        const Color(0xFFE8DDF4),      ],    ).createShader(rectRight1);    var pathRight2 = Path();    pathRight2.moveTo(size.width, 0);    pathRight2.lineTo(size.width * 0.4, 0);    pathRight2.quadraticBezierTo(size.width * 0.97,size.height * 0.04,size.width, size.height * 0.01);    pathRight2.close();    canvas.drawPath(pathRight2, paint);    // المثلث الخلفي (الأيسر)    final Rect rect1 = Rect.fromLTWH(0, 0, size.width, size.height * 0.35);    paint.shader = LinearGradient(      begin: Alignment.centerLeft,      end: Alignment.centerRight,      colors: [        Colors.white,        const Color(0xFFE8DDF4),        const Color(0xFFB293CD),      ],      stops: const [0.0, 0.03, 1.0],    ).createShader(rect1);    var path1 = Path();    path1.moveTo(0, 0);    path1.lineTo(size.width * 0.8, 0);    path1.quadraticBezierTo(size.width * 0.10,size.height * 0.10,0, size.height * 0.18);    path1.close();    canvas.drawPath(path1, paint);    // المثلث الأمامي (الأيسر)    final Rect rect2 = Rect.fromLTWH(0, 0, size.width, size.height * 0.28);    paint.shader = LinearGradient(      begin: Alignment.centerLeft,      end: Alignment.centerRight,      colors: [        const Color(0xFFB293CD),        const Color(0xFFE8DDF4),        Colors.white,      ],      stops: const [0.0, 0.75, 1.0],    ).createShader(rect2);    var path2 = Path();    path2.moveTo(0, 0);    path2.lineTo(size.width * 0.55, 0);    path2.quadraticBezierTo(size.width * 0.9,-size.height * 0.1, 0, size.height * 0.10);    path2.close();    canvas.drawPath(path2, paint);  }  void _drawBottomWaves(Canvas canvas, Size size, Paint paint) {    // القوس السفلي الأكبر    paint.shader = LinearGradient(      begin: Alignment.bottomLeft,      end: Alignment.topRight,      colors: [const Color(0xFFB293CD).withOpacity(0.6), Colors.white],    ).createShader(Rect.fromLTWH(0, size.height * 0.8, size.width, size.height * 0.2));    var path3 = Path();    path3.moveTo(0, size.height);    path3.lineTo(size.width, size.height);    path3.lineTo(size.width, size.height * 0.85);    path3.quadraticBezierTo(size.width * 0.5, size.height * 0.95, 0, size.height * 0.88);    path3.close();    canvas.drawPath(path3, paint);    // القوس السفلي الأصغر (أغمق)    paint.shader = LinearGradient(      begin: Alignment.bottomLeft,      end: Alignment.topRight,      colors: [const Color(0xFFB293CD), const Color(0xFFFBF8FF)],    ).createShader(Rect.fromLTWH(0, size.height * 0.9, size.width, size.height * 0.1));    var path4 = Path();    path4.moveTo(0, size.height);    path4.lineTo(size.width, size.height);    path4.lineTo(size.width, size.height * 0.92);    path4.quadraticBezierTo(size.width * 0.4, size.height * 0.98, 0, size.height * 0.94);    path4.close();    canvas.drawPath(path4, paint);  }  @override  bool shouldRepaint(CustomPainter oldDelegate) => true;}
