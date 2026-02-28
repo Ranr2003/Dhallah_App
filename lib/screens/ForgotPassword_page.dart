@@ -1,4 +1,7 @@
 import '../widgets/login_signup_background.dart';
+import '../widgets/custom_button1.dart';
+import'../Widgets/custom_text_field.dart';
+import'../widgets/custom_text_link.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -54,54 +57,19 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-  Widget _buildResetButton() {
-    return GestureDetector(
-      onTap: _isLoading ? null : _sendResetLink,
-      child: Container(
-        width: double.infinity,
-        height: 55,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.centerRight,
-            end: Alignment.centerLeft,
-            colors: [Color(0xFFE9D7F7), Color(0xFFD2B4EC)],
-          ),
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFD2B4EC).withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Center(
-          child: _isLoading
-              ? const SizedBox(height: 25, width: 25, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : const Text("إرسال الرابط", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return LoginSignupBackground(
-      child: LayoutBuilder( // يستخدم LayoutBuilder لمعرفة حجم الشاشة المتاح
+      child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             child: ConstrainedBox(
-              constraints: BoxConstraints(
-                // هنا السر: نجبر الحاوية أن يكون أقل طول لها هو طول الشاشة
-                minHeight: constraints.maxHeight,
-              ),
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 25.0),
                 child: Column(
-                  // نجعل العناصر تتوزع على كامل المساحة المتاحة
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Icon(Icons.lock_reset, size: 100, color: Color(0xFFB293CD)),
                     const SizedBox(height: 20),
@@ -111,26 +79,34 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFFB293CD)),
                     ),
                     const SizedBox(height: 40),
-                    TextField(
+
+                    // استخدام الحقل الموحد مع الـ hintText (تعديلك المفضل)
+                    CustomInputField(
+                      label: "البريد الإلكتروني",
+                      hintText: "أدخل بريدك المسجل لدينا",
                       controller: _emailController,
-                      textAlign: TextAlign.right,
                       keyboardType: TextInputType.emailAddress,
-                      decoration: InputDecoration(
-                        hintText: "البريد الإلكتروني",
-                        filled: true,
-                        fillColor: Colors.white.withOpacity(0.9),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                        prefixIcon: const Icon(Icons.email_outlined, color: Color(0xFFC0A2DB)),
-                      ),
+                      fillColor: Colors.white.withOpacity(0.9), // حافظنا على شفافية الصفحة
                     ),
+
                     const SizedBox(height: 30),
-                    _buildResetButton(),
-                    const SizedBox(height: 20),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text("العودة لتسجيل الدخول", style: TextStyle(color: Color(0xFFC0A2DB), fontWeight: FontWeight.w600)),
+
+                    // الزر المائي الموحد
+                    WaterRippleButton(
+                      text: "إرسال الرابط",
+                      onTap: _sendResetLink,
+                      isLoading: _isLoading,
                     ),
-                    // أضفت مساحة فارغة في الأسفل لضمان التوازن البصري
+
+                    const SizedBox(height: 25),
+
+                    // التعديل المطلوب: العودة للدخول باستخدام التكست لينك
+                    CustomTextLink(
+                      text: "العودة لتسجيل الدخول",
+                      fontSize: 14,
+                      onTap: () => Navigator.pop(context),
+                    ),
+
                     const SizedBox(height: 50),
                   ],
                 ),
