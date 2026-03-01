@@ -9,39 +9,59 @@ import 'login_page.dart';
 
 class ProfilePage extends StatefulWidget {
   final String userEmail;
+  final String loginProvider; // 'google', 'phone', أو 'email'
+  final bool canEditPassword;
 
-  const ProfilePage({super.key, required this.userEmail});
+  const ProfilePage({
+    super.key,
+    required this.userEmail,
+    required this.loginProvider,
+    this.canEditPassword = false,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  File? _image;
-  final ImagePicker _picker = ImagePicker();
-
   late TextEditingController _emailController;
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passController = TextEditingController();
 
+  // القيم الأصلية للمقارنة (تأكدي من جلبها من قاعدة البيانات لاحقاً)
+  late String _initialName = "رند خالد";
+  late String _initialPhone = "593426953";
+
+  bool _showNoChangeError = false;
+
   @override
   void initState() {
     super.initState();
     _emailController = TextEditingController(text: widget.userEmail);
+    _nameController.text = _initialName;
+    _phoneController.text = _initialPhone;
   }
 
-  // هذه هي الدالة التي كانت مفقودة وتسببت في الخطأ
-  Future<void> _pickImage() async {
-    try {
-      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
-      if (pickedFile != null) {
-        setState(() {
-          _image = File(pickedFile.path);
-        });
-      }
-    } catch (e) {
-      debugPrint("خطأ في اختيار الصورة: $e");
+  // التحقق من وجود تغييرات حقيقية
+  bool _checkIfDataChanged() {
+    return _nameController.text != _initialName ||
+        _phoneController.text != _initialPhone ||
+        _passController.text.isNotEmpty;
+  }
+
+  void _onSavePressed() {
+    if (!_checkIfDataChanged()) {
+      setState(() => _showNoChangeError = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("لم يتم إجراء أي تغييرات لحفظها")),
+      );
+    } else {
+      setState(() => _showNoChangeError = false);
+      // هنا تضعين كود التحديث في Firebase
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("تم حفظ التعديلات بنجاح")),
+      );
     }
   }
 
@@ -59,77 +79,86 @@ class _ProfilePageState extends State<ProfilePage> {
     return LoginSignupBackground(
       child: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
           child: Column(
             children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 65,
-                    backgroundColor: const Color(0xFFD2B4EC).withOpacity(0.2),
-                    child: ClipOval(
-                      child: _image != null
-                          ? Image.file(_image!, width: 130, height: 130, fit: BoxFit.cover)
-                          : Image.asset(
-                        'assets/images/df_Avtar.png',
-                        width: 130, height: 130, fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) =>
-                        const Icon(Icons.person, size: 60, color: Colors.grey),
-                      ),
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _pickImage, // الآن ستعمل بدون أخطاء
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: const BoxDecoration(color: Color(0xFFD2B4EC), shape: BoxShape.circle),
-                        child: const Icon(Icons.edit, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 15),
+              // العنوان العلوي بدون صورة
               const Text(
                 "الملف الشخصي",
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF5A4A75), fontFamily: 'Cairo'),
+                style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF5A4A75),
+                    fontFamily: 'Cairo'
+                ),
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: 40),
 
-              CustomInputField(
-                label: "الاسم الكامل",
-                hintText: "أدخل اسمك هنا",
-                controller: _nameController,
-                fillColor: Colors.white.withOpacity(0.7),
+              // حقل الاسم
+              _buildInputWrapper(
+                isError: _showNoChangeError && _nameController.text == _initialName,
+                child: CustomInputField(
+                  label: "الاسم الكامل",
+                  hintText: "أدخل اسمك هنا",
+                  controller: _nameController,
+                  fillColor: Colors.white.withOpacity(0.7),
+                ),
               ),
               const SizedBox(height: 15),
 
+              // حقل البريد - مقفل إذا دخل بالإيميل أو جوجل
               CustomInputField(
                 label: "البريد الإلكتروني",
                 hintText: "example@mail.com",
                 controller: _emailController,
-                fillColor: Colors.white.withOpacity(0.7),
+                readOnly: widget.loginProvider == 'email' || widget.loginProvider == 'google',
+                fillColor: (widget.loginProvider == 'email' || widget.loginProvider == 'google')
+                    ? Colors.grey.withOpacity(0.2)
+                    : Colors.white.withOpacity(0.7),
               ),
               const SizedBox(height: 15),
 
-              CustomInputField(
-                label: "رقم الهاتف",
-                hintText: "+966 xxxxxxxxx",
-                controller: _phoneController,
-                fillColor: Colors.white.withOpacity(0.7),
-                keyboardType: TextInputType.phone,
+              // حقل الجوال - مقفل إذا دخل بالجوال
+              _buildInputWrapper(
+                isError: _showNoChangeError && _phoneController.text == _initialPhone,
+                child: CustomInputField(
+                  label: "رقم الهاتف",
+                  hintText: "+966 xxxxxxxxx",
+                  controller: _phoneController,
+                  readOnly: widget.loginProvider == 'phone',
+                  fillColor: widget.loginProvider == 'phone'
+                      ? Colors.grey.withOpacity(0.2)
+                      : Colors.white.withOpacity(0.7),
+                  keyboardType: TextInputType.phone,
+                ),
               ),
               const SizedBox(height: 15),
 
-              CustomInputField(
-                label: "كلمة السر الجديدة",
-                hintText: "أدخل كلمة سر قوية",
-                controller: _passController,
-                isPass: true,
-                fillColor: Colors.white.withOpacity(0.7),
+              // حقل كلمة السر
+              AbsorbPointer(
+                absorbing: !widget.canEditPassword,
+                child: _buildInputWrapper(
+                  isError: _showNoChangeError && _passController.text.isEmpty,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      border: widget.canEditPassword
+                          ? Border.all(color: Colors.green, width: 2)
+                          : null,
+                    ),
+                    child: CustomInputField(
+                      label: "كلمة السر الجديدة",
+                      hintText: widget.canEditPassword
+                          ? "أدخل كلمة سر قوية"
+                          : "تعديل كلمة السر متاح عبر الاستعادة فقط",
+                      controller: _passController,
+                      isPass: true,
+                      fillColor: widget.canEditPassword
+                          ? Colors.white.withOpacity(0.9)
+                          : Colors.grey.withOpacity(0.3),
+                    ),
+                  ),
+                ),
               ),
 
               const SizedBox(height: 35),
@@ -138,14 +167,15 @@ class _ProfilePageState extends State<ProfilePage> {
                 text: "حفظ التعديلات",
                 width: 200,
                 height: 50,
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("تم حفظ التعديلات بنجاح")),
-                  );
-                },
+                onTap: _onSavePressed,
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 30),
+
+              // وسيلة الدخول (مكانها الجديد قبل الخروج)
+              _buildProviderStatus(),
+
+              const SizedBox(height: 10),
 
               TextButton.icon(
                 onPressed: () {
@@ -165,6 +195,50 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ),
       ),
+    );
+  }
+
+  // حاوية الحدود الحمراء للتنبيه
+  Widget _buildInputWrapper({required Widget child, required bool isError}) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(
+          color: isError ? Colors.redAccent : Colors.transparent,
+          width: 2,
+        ),
+      ),
+      child: child,
+    );
+  }
+
+  // عرض وسيلة الدخول
+  Widget _buildProviderStatus() {
+    IconData icon;
+    String text;
+
+    switch (widget.loginProvider) {
+      case 'google':
+        icon = Icons.g_mobiledata; text = "طريقة الدخول: حساب Google";
+        break;
+      case 'phone':
+        icon = Icons.phone_android; text = "طريقة الدخول: رقم الجوال";
+        break;
+      default:
+        icon = Icons.email_outlined; text = "طريقة الدخول: البريد الإلكتروني";
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, color: const Color(0xFF5A4A75), size: 20),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 13, color: Colors.grey, fontFamily: 'Cairo'),
+        ),
+      ],
     );
   }
 }

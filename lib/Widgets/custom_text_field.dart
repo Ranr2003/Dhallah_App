@@ -5,9 +5,9 @@ class CustomInputField extends StatelessWidget {
   final String hintText;
   final TextEditingController controller;
   final bool isPass;
-  final Color fillColor;
   final TextInputType keyboardType;
-  final String? Function(String?)? validator; // للتحقق من الأخطاء
+  final Color? fillColor;
+  final bool readOnly;
 
   const CustomInputField({
     super.key,
@@ -15,54 +15,44 @@ class CustomInputField extends StatelessWidget {
     required this.hintText,
     required this.controller,
     this.isPass = false,
-    this.fillColor = const Color(0xFFFBF9FF), // لون افتراضي
-    this.keyboardType = TextInputType.text,   // نوع البيانات
-    this.validator,
+    this.keyboardType = TextInputType.text,
+    this.fillColor,
+    this.readOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      // تم التعديل هنا ليكون العنوان في اليمين تماماً
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 5, bottom: 6),
-          child: Text(
-            label,
-            style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
-                color: Color(0xFF444444)),
+        Text(
+          label,
+          textAlign: TextAlign.right, // لضمان اتجاه النص العربي
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontFamily: 'Cairo',
+            fontSize: 14,
+            color: Color(0xFF5A4A75),
           ),
         ),
-        TextFormField( // استخدمنا TextFormField لدعم الـ Validator
+        const SizedBox(height: 8),
+        TextField(
           controller: controller,
           obscureText: isPass,
-          textAlign: TextAlign.right,
           keyboardType: keyboardType,
-          validator: validator, // هنا تظهر رسالة الخطأ لو البيانات غير مطابقة
+          readOnly: readOnly,
+          textAlign: TextAlign.right, // النص داخل الحقل يبدأ من اليمين
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: const TextStyle(color: Colors.grey, fontSize: 13),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+            hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
             filled: true,
-            fillColor: fillColor, // اللون اللي تحدده لكل ملف
-            enabledBorder: OutlineInputBorder(
+            fillColor: fillColor ?? Colors.white.withOpacity(0.7),
+            border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+              borderSide: BorderSide.none,
             ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: Color(0xFFD2B4EC), width: 1.5),
-            ),
-            errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: Colors.red, width: 1),
-            ),
-            focusedErrorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(15),
-              borderSide: const BorderSide(color: Colors.red, width: 1.5),
-            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
           ),
         ),
       ],

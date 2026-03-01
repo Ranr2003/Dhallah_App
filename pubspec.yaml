@@ -38,6 +38,8 @@ dependencies:
   firebase_auth: ^5.0.0
   cloud_firestore: ^5.0.0
   image_picker: ^1.0.7
+  font_awesome_flutter: ^10.7.0
+  intl_phone_field: ^3.1.0
 
 dev_dependencies:
   flutter_test:

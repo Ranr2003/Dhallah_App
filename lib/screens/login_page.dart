@@ -1,7 +1,8 @@
 //Rand
+import 'dart:async'; // ضروري جداً للتايمر
 import 'package:dhallah_app/screens/account_info_page.dart';
 import 'package:dhallah_app/services/authentication_serv.dart';
-import 'package:flutter/material.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
 import'../Widgets/custom_text_field.dart';
@@ -9,6 +10,8 @@ import'../widgets/custom_text_link.dart';
 import 'package:flutter/gestures.dart';
 import '../screens/signup_page.dart';
 import '../screens/ForgotPassword_page.dart';
+import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 // استيراد السيرفس الخاصة بك
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -24,46 +27,233 @@ class _LoginPageState extends State<LoginPage> {
 
   bool _isLoading = false;
 
+  // --- متغيرات الجوال والتايمر والـ OTP ---
+  bool isCodeSent = false;
+  String _phoneNumber = "";
+  String? _phoneError;
+  List<String> _otpCode = ["", "", "", ""]; // لتخزين أرقام الكود
+  bool _isOtpError = false; // هل الكود المدخل خطأ؟
+
+  Timer? _timer;
+  int _start = 180; // 3 دقائق = 180 ثانية
+  bool _isTimerActive = false;
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _timer?.cancel();
     super.dispose();
+  }
+
+  void startTimer(StateSetter setSheetState) {
+    _isTimerActive = true;
+    _start = 180;
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      setSheetState(() {
+        if (_start == 0) {
+          _isTimerActive = false;
+          timer.cancel();
+        } else {
+          _start--;
+        }
+      });
+    });
+  }
+
+  void _showPhoneLoginSheet() {
+    isCodeSent = false;
+    _phoneError = null;
+    _otpCode = ["", "", "", ""]; // تصفير الكود عند الفتح
+    _isOtpError = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          // فحص هل تم تعبئة جميع مربعات الكود؟ لتعطيل الزر
+          bool isOtpComplete = _otpCode.every((digit) => digit.isNotEmpty);
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+                  const SizedBox(height: 20),
+
+                  if (!isCodeSent) ...[
+                    const Text("تسجيل الدخول بالجوال", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                    const SizedBox(height: 10),
+                    const Text("أدخل رقم جوالك لتصلك رسالة التأكيد", style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    const SizedBox(height: 30),
+                    IntlPhoneField(
+                      disableLengthCheck: true,
+                      decoration: InputDecoration(
+                        labelText: 'رقم الجوال',
+                        hintText: '5xxxxxxx',
+                        fillColor: const Color(0xFFFBF9FF),
+                        filled: true,
+                        errorText: _phoneError,
+                        errorStyle: const TextStyle(fontSize: 10, height: 0.8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.redAccent)),
+                      ),
+                      initialCountryCode: 'SA',
+                      onChanged: (phone) {
+                        _phoneNumber = phone.number;
+                        if(_phoneError != null) setSheetState(() => _phoneError = null);
+                      },
+                    ),
+                  ] else ...[
+                    const Text("رمز التحقق", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                    const SizedBox(height: 10),
+                    Text("أدخل الرمز المرسل إلى 966$_phoneNumber+", style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
+                    const SizedBox(height: 30),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: List.generate(4, (index) => _buildOTPBox(context, index, setSheetState)),
+                    ),
+                    if (_isOtpError) ...[
+                      const SizedBox(height: 12),
+                      const Text("رمز التحقق غير صحيح، حاول مرة أخرى", style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                    ],
+                    const SizedBox(height: 20),
+                    _isTimerActive
+                        ? Text("إعادة الإرسال خلال ${(_start ~/ 60)}:${(_start % 60).toString().padLeft(2, '0')}",
+                        style: const TextStyle(fontSize: 13, color: Colors.orangeAccent, fontWeight: FontWeight.bold))
+                        : CustomTextLink(
+                      text: "إعادة إرسال الرمز؟",
+                      onTap: () => startTimer(setSheetState),
+                    ),
+                  ],
+
+                  const SizedBox(height: 30),
+
+                  // تم إضافة Opacity لتعطيل الزر بصرياً إذا لم يكتمل الكود
+                  Opacity(
+                    opacity: (isCodeSent && !isOtpComplete) ? 0.5 : 1.0,
+                    child: WaterRippleButton(
+                      text: isCodeSent ? "تحقق ودخول" : "إرسال رمز التحقق",
+                      onTap: (isCodeSent && !isOtpComplete) ? () {} : () {
+                        setSheetState(() {
+                          if (!isCodeSent) {
+                            if (_phoneNumber.trim().isEmpty) {
+                              _phoneError = "الرجاء إدخال رقم الجوال";
+                            }
+                            else if (_phoneNumber.length != 9 || !_phoneNumber.startsWith('5')) {
+                              _phoneError = "الرجاء التأكد من صحة رقم الجوال";
+                            }
+                            else {
+                              _phoneError = null;
+                              isCodeSent = true;
+                              startTimer(setSheetState);
+                            }
+                          } else {
+                            // فحص الكود (تجريبي: 1234)
+                            String enteredCode = _otpCode.join("");
+                            if (enteredCode == "1234") {
+                              _isOtpError = false;
+                              Navigator.pop(context);
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ProfilePage(
+                                    userEmail: "966$_phoneNumber+",
+                                    loginProvider: "phone", // أضيفي هذا السطر
+                                  ),                                ),
+                                    (route) => false,
+                              );
+                            } else {
+                              _isOtpError = true; // تلوين المربعات بالأحمر
+                            }
+                          }
+                        });
+                      },
+                      width: double.infinity,
+                      height: 55,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // دالة المربعات مع دعم تلوين الخطأ
+  Widget _buildOTPBox(BuildContext context, int index, StateSetter setSheetState) {
+    return SizedBox(
+      width: 60,
+      child: TextField(
+        autofocus: index == 0,
+        textAlign: TextAlign.center,
+        keyboardType: TextInputType.number,
+        maxLength: 1,
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF673AB7)),
+        decoration: InputDecoration(
+          counterText: "",
+          fillColor: const Color(0xFFFBF9FF),
+          filled: true,
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFFEEEEEE), width: _isOtpError ? 2 : 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFF673AB7), width: 2),
+          ),
+        ),
+        onChanged: (value) {
+          setSheetState(() {
+            _otpCode[index] = value;
+            _isOtpError = false; // مسح الخطأ عند التعديل
+          });
+          if (value.length == 1 && index < 3) {
+            FocusScope.of(context).nextFocus();
+          } else if (value.isEmpty && index > 0) {
+            FocusScope.of(context).previousFocus();
+          }
+        },
+      ),
+    );
   }
 
   void _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")));
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
-      final user = await _authService.login(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
-
+      final user = await _authService.login(_emailController.text.trim(), _passwordController.text.trim());
       if (user != null && mounted) {
+// أضيفي loginProvider: "email"
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-            builder: (context) => ProfilePage(userEmail: _emailController.text.trim()),
+            builder: (context) => ProfilePage(
+              userEmail: _emailController.text.trim(),
+              loginProvider: "email", // أضيفي هذا السطر
+            ),
           ),
               (route) => false,
-        );
-      }
+        );      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString().replaceAll("Exception:", "")),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: Colors.redAccent));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -72,13 +262,12 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    // التصميم الأساسي لصفحتك كما هو بالضبط
     return LoginSignupBackground(
       child: Center(
         child: SingleChildScrollView(
           child: Container(
-            width: MediaQuery.of(context).size.width > 600
-                ? 400
-                : MediaQuery.of(context).size.width * 0.85,
+            width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.85,
             padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 35),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -96,70 +285,76 @@ class _LoginPageState extends State<LoginPage> {
               children: [
                 Image.asset('assets/images/logo.jpeg', height: 80, fit: BoxFit.contain),
                 const SizedBox(height: 15),
-                const Text(
-                  "تسجيل الدخول",
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF444444)),
-                ),
-                const Text(
-                  "! هلابك من جديد ",
-                  style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
-                ),
+                const Text("تسجيل الدخول", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                const Text("! هلابك من جديد ", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 30),
 
-                // استخدام الـ Widget الجديد للحقول
-                CustomInputField(
-                  label: "البريد الإلكتروني",
-                  hintText: "أدخل بريدك الإلكتروني",
-                  controller: _emailController,
-                  fillColor: const Color(0xFFFBF9FF), // حافظنا على نفس اللون
-                  keyboardType: TextInputType.emailAddress,
-                ),
+                CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك الإلكتروني", controller: _emailController, fillColor: const Color(0xFFFBF9FF), keyboardType: TextInputType.emailAddress),
                 const SizedBox(height: 18),
-                CustomInputField(
-                  label: "كلمة السر",
-                  hintText: "أدخل كلمة السر",
-                  controller: _passwordController,
-                  isPass: true,
-                  fillColor: const Color(0xFFFBF9FF),
-                ),
+                CustomInputField(label: "كلمة السر", hintText: "أدخل كلمة السر", controller: _passwordController, isPass: true, fillColor: const Color(0xFFFBF9FF)),
 
                 const SizedBox(height: 30),
 
-                WaterRippleButton(
-                  text: "دخول",
-                  onTap: _handleLogin,
-                  isLoading: _isLoading,
-                  width: double.infinity,
-                  height: 55,
-                ),
+                WaterRippleButton(text: "دخول", onTap: _handleLogin, isLoading: _isLoading, width: double.infinity, height: 55),
+
+                const SizedBox(height: 25),
+
+                const Row(children: [
+                  Expanded(child: Divider(thickness: 1, color: Color(0xFFEEEEEE))),
+                  Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text("أو سجل الدخول عبر", style: TextStyle(color: Colors.grey, fontSize: 12))),
+                  Expanded(child: Divider(thickness: 1, color: Color(0xFFEEEEEE))),
+                ]),
 
                 const SizedBox(height: 20),
 
-                // استخدام الـ Widget الجديد للروابط
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildSocialIcon(FontAwesomeIcons.apple, Colors.black, "أبل", () {}),
+                    _buildSocialIcon(FontAwesomeIcons.microsoft, const Color(0xFF00A4EF), "مايكروسوفت", () {}),
+                    _buildSocialIcon(FontAwesomeIcons.google, const Color(0xFFDB4437), "قوقل", () {}),
+                    _buildSocialIcon(Icons.phone_android, const Color(0xFF673AB7), "رقم الجوال", _showPhoneLoginSheet),
+                  ],
+                ),
+
+                const SizedBox(height: 25),
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    CustomTextLink(
-                      text: "  قم بتسجيل حساب جديد  ",
-                      onTap: () {
-                        Navigator.push(context, MaterialPageRoute(builder: (context) => const SignUpPage()));
-                      },
-                    ),
+                    CustomTextLink(text: "  قم بتسجيل حساب جديد  ", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const SignUpPage()))),
                     const Text("ليس لديك حساب ؟   ", style: TextStyle(color: Colors.grey, fontSize: 13)),
                   ],
                 ),
                 const SizedBox(height: 12),
-                CustomTextLink(
-                  text: "نسيت كلمة السر؟",
-                  onTap: () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()));
-                  },
-                ),
+                CustomTextLink(text: "نسيت كلمة السر؟", onTap: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()))),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSocialIcon(IconData icon, Color color, String label, VoidCallback onTap) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFFF0F0F0)),
+                color: Colors.white,
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 5, spreadRadius: 1)]
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+      ],
     );
   }
 }
