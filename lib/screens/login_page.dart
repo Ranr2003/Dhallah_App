@@ -2,6 +2,7 @@
 import 'dart:async'; // ضروري جداً للتايمر
 import 'package:dhallah_app/screens/account_info_page.dart';
 import 'package:dhallah_app/services/authentication_serv.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
@@ -30,12 +31,14 @@ class _LoginPageState extends State<LoginPage> {
   // --- متغيرات الجوال والتايمر والـ OTP ---
   bool isCodeSent = false;
   String _phoneNumber = "";
+  String _fullPhoneNumber = ""; // لتخزين الرقم بالصيغة الدولية
   String? _phoneError;
-  List<String> _otpCode = ["", "", "", ""]; // لتخزين أرقام الكود
-  bool _isOtpError = false; // هل الكود المدخل خطأ؟
+  String _verificationId = ""; // مهم جداً لفايربيس
+  List<String> _otpCode = ["", "", "", "", "", ""];
+  bool _isOtpError = false;
 
   Timer? _timer;
-  int _start = 180; // 3 دقائق = 180 ثانية
+  int _start = 180;
   bool _isTimerActive = false;
 
   @override
@@ -65,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
   void _showPhoneLoginSheet() {
     isCodeSent = false;
     _phoneError = null;
-    _otpCode = ["", "", "", ""]; // تصفير الكود عند الفتح
+    _otpCode = ["", "", "", "", "", ""];
     _isOtpError = false;
 
     showModalBottomSheet(
@@ -74,7 +77,6 @@ class _LoginPageState extends State<LoginPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
-          // فحص هل تم تعبئة جميع مربعات الكود؟ لتعطيل الزر
           bool isOtpComplete = _otpCode.every((digit) => digit.isNotEmpty);
 
           return Padding(
@@ -111,17 +113,18 @@ class _LoginPageState extends State<LoginPage> {
                       initialCountryCode: 'SA',
                       onChanged: (phone) {
                         _phoneNumber = phone.number;
+                        _fullPhoneNumber = phone.completeNumber; // يأخذ +966 تلقائياً
                         if(_phoneError != null) setSheetState(() => _phoneError = null);
                       },
                     ),
                   ] else ...[
                     const Text("رمز التحقق", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
                     const SizedBox(height: 10),
-                    Text("أدخل الرمز المرسل إلى 966$_phoneNumber+", style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
+                    Text("أدخل الرمز المرسل إلى $_fullPhoneNumber", style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
                     const SizedBox(height: 30),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: List.generate(4, (index) => _buildOTPBox(context, index, setSheetState)),
+                      children: List.generate(6, (index) => _buildOTPBox(context, index, setSheetState)),
                     ),
                     if (_isOtpError) ...[
                       const SizedBox(height: 12),
@@ -133,51 +136,69 @@ class _LoginPageState extends State<LoginPage> {
                         style: const TextStyle(fontSize: 13, color: Colors.orangeAccent, fontWeight: FontWeight.bold))
                         : CustomTextLink(
                       text: "إعادة إرسال الرمز؟",
-                      onTap: () => startTimer(setSheetState),
+                      onTap: () {
+                        // إعادة إرسال الرمز عبر فايربيس
+                        _authService.verifyPhoneNumber(
+                          phoneNumber: _fullPhoneNumber,
+                          onCodeSent: (id) => setSheetState(() => _verificationId = id),
+                          onError: (err) => setSheetState(() => _phoneError = err),
+                        );
+                        startTimer(setSheetState);
+                      },
                     ),
                   ],
 
                   const SizedBox(height: 30),
 
-                  // تم إضافة Opacity لتعطيل الزر بصرياً إذا لم يكتمل الكود
                   Opacity(
                     opacity: (isCodeSent && !isOtpComplete) ? 0.5 : 1.0,
                     child: WaterRippleButton(
                       text: isCodeSent ? "تحقق ودخول" : "إرسال رمز التحقق",
-                      onTap: (isCodeSent && !isOtpComplete) ? () {} : () {
-                        setSheetState(() {
-                          if (!isCodeSent) {
-                            if (_phoneNumber.trim().isEmpty) {
-                              _phoneError = "الرجاء إدخال رقم الجوال";
-                            }
-                            else if (_phoneNumber.length != 9 || !_phoneNumber.startsWith('5')) {
-                              _phoneError = "الرجاء التأكد من صحة رقم الجوال";
-                            }
-                            else {
-                              _phoneError = null;
-                              isCodeSent = true;
-                              startTimer(setSheetState);
-                            }
+                      onTap: (isCodeSent && !isOtpComplete) ? () {} : () async {
+                        if (!isCodeSent) {
+                          if (_phoneNumber.trim().isEmpty) {
+                            setSheetState(() => _phoneError = "الرجاء إدخال رقم الجوال");
+                          } else if (_phoneNumber.length != 9) {
+                            setSheetState(() => _phoneError = "الرجاء التأكد من صحة رقم الجوال");
                           } else {
-                            // فحص الكود (تجريبي: 1234)
-                            String enteredCode = _otpCode.join("");
-                            if (enteredCode == "1234") {
-                              _isOtpError = false;
+                            // الربط الحقيقي: إرسال الكود
+                            await _authService.verifyPhoneNumber(
+                                phoneNumber: _fullPhoneNumber,
+                                onCodeSent: (id) {
+                                  setSheetState(() {
+                                    _verificationId = id;
+                                    isCodeSent = true;
+                                    _phoneError = null;
+                                    startTimer(setSheetState);
+                                  });
+                                },
+                                onError: (error) {
+                                  setSheetState(() => _phoneError = error);
+                                }
+                            );
+                          }
+                        } else {
+                          // الربط الحقيقي: التحقق من الكود
+                          String enteredCode = _otpCode.join("");
+                          try {
+                            final user = await _authService.signInWithOTP(_verificationId, enteredCode);
+                            if (user != null) {
                               Navigator.pop(context);
                               Navigator.pushAndRemoveUntil(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => ProfilePage(
-                                    userEmail: "966$_phoneNumber+",
-                                    loginProvider: "phone", // أضيفي هذا السطر
-                                  ),                                ),
+                                    userEmail: _fullPhoneNumber,
+                                    loginProvider: "phone",
+                                  ),
+                                ),
                                     (route) => false,
                               );
-                            } else {
-                              _isOtpError = true; // تلوين المربعات بالأحمر
                             }
+                          } catch (e) {
+                            setSheetState(() => _isOtpError = true);
                           }
-                        });
+                        }
                       },
                       width: double.infinity,
                       height: 55,
@@ -193,10 +214,9 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  // دالة المربعات مع دعم تلوين الخطأ
   Widget _buildOTPBox(BuildContext context, int index, StateSetter setSheetState) {
     return SizedBox(
-      width: 60,
+      width: 45,
       child: TextField(
         autofocus: index == 0,
         textAlign: TextAlign.center,
@@ -219,9 +239,9 @@ class _LoginPageState extends State<LoginPage> {
         onChanged: (value) {
           setSheetState(() {
             _otpCode[index] = value;
-            _isOtpError = false; // مسح الخطأ عند التعديل
+            _isOtpError = false;
           });
-          if (value.length == 1 && index < 3) {
+          if (value.length == 1 && index < 5) {
             FocusScope.of(context).nextFocus();
           } else if (value.isEmpty && index > 0) {
             FocusScope.of(context).previousFocus();
@@ -231,6 +251,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+  // --- دالة تسجيل الدخول بالإيميل (بقيت كما هي) ---
   void _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")));
@@ -240,17 +261,17 @@ class _LoginPageState extends State<LoginPage> {
     try {
       final user = await _authService.login(_emailController.text.trim(), _passwordController.text.trim());
       if (user != null && mounted) {
-// أضيفي loginProvider: "email"
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => ProfilePage(
               userEmail: _emailController.text.trim(),
-              loginProvider: "email", // أضيفي هذا السطر
+              loginProvider: "email",
             ),
           ),
               (route) => false,
-        );      }
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: Colors.redAccent));
@@ -262,7 +283,6 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // التصميم الأساسي لصفحتك كما هو بالضبط
     return LoginSignupBackground(
       child: Center(
         child: SingleChildScrollView(
@@ -312,8 +332,30 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     _buildSocialIcon(FontAwesomeIcons.apple, Colors.black, "أبل", () {}),
                     _buildSocialIcon(FontAwesomeIcons.microsoft, const Color(0xFF00A4EF), "مايكروسوفت", () {}),
-                    _buildSocialIcon(FontAwesomeIcons.google, const Color(0xFFDB4437), "قوقل", () {}),
-                    _buildSocialIcon(Icons.phone_android, const Color(0xFF673AB7), "رقم الجوال", _showPhoneLoginSheet),
+                    _buildSocialIcon(FontAwesomeIcons.google, const Color(0xFFDB4437), "قوقل", () async {
+                      setState(() => _isLoading = true); // تشغيل مؤشر التحميل
+
+                      User? user = await _authService.signInWithGoogle();
+
+                      setState(() => _isLoading = false); // إيقاف مؤشر التحميل
+
+                      if (user != null) {
+                        Navigator.pushAndRemoveUntil(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProfilePage(
+                              userEmail: user.email ?? "",
+                              loginProvider: "google",
+                            ),
+                          ),
+                              (route) => false,
+                        );
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text("فشل تسجيل الدخول عبر قوقل")),
+                        );
+                      }
+                    }),                    _buildSocialIcon(Icons.phone_android, const Color(0xFF673AB7), "رقم الجوال", _showPhoneLoginSheet),
                   ],
                 ),
 
