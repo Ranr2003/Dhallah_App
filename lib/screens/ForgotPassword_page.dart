@@ -25,8 +25,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   String? _phoneError;
   bool _isOtpSent = false;
   bool _isOtpError = false;
-  List<String> _otpCode = ["", "", "", ""];
-
+  List<String> _otpCode = ["", "", "", "", "", ""];
   Timer? _timer;
   int _start = 180;
   bool _isTimerActive = false;
@@ -71,7 +70,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   void _verifyOtpAndNavigate() {
     String fullCode = _otpCode.join("");
-    if (fullCode == "1234") {
+    if (fullCode == "123456") {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -167,7 +166,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       const SizedBox(height: 20),
                       Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: List.generate(4, (index) => _buildOTPBox(index))
+                          children: List.generate(6, (index) => _buildOTPBox(index))
                       ),
                       if (_isOtpError)
                         const Padding(
@@ -202,7 +201,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   Widget _buildOTPBox(int index) {
     return SizedBox(
-      width: 55,
+      width: 45,
       child: TextField(
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
@@ -217,7 +216,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         ),
         onChanged: (value) {
           setState(() { _otpCode[index] = value; _isOtpError = false; });
-          if (value.isNotEmpty && index < 3) FocusScope.of(context).nextFocus();
+          if (value.isNotEmpty && index < 5) FocusScope.of(context).nextFocus();
           if (value.isEmpty && index > 0) FocusScope.of(context).previousFocus();
         },
       ),
