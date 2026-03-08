@@ -1,4 +1,5 @@
 import 'package:dhallah_app/screens/account_info_page.dart';
+import 'package:dhallah_app/services/authentication_serv.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
 import'../Widgets/custom_text_field.dart';
@@ -20,6 +21,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
   bool _usePhone = true; // نخليه افتراضي على الجوال مثل صورتك
+  final AuthenticationService _authService = AuthenticationService();
+  String _verificationId = "";
 
   String _phoneNumber = "";
   String? _phoneError;
@@ -56,33 +59,67 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
   }
 
-  void _handlePhoneReset() {
+  void _handlePhoneReset() async {
     if (_phoneNumber.length != 9 || !_phoneNumber.startsWith('5')) {
       setState(() => _phoneError = "الرجاء التأكد من صحة رقم الجوال");
       return;
     }
-    setState(() {
-      _phoneError = null;
-      _isOtpSent = true;
-      startTimer();
-    });
+
+    setState(() => _isLoading = true);
+
+    // نستخدم الخدمة الحقيقية لإرسال الكود
+    await _authService.verifyPhoneNumber(
+      phoneNumber: "+966$_phoneNumber",
+      onCodeSent: (id) {
+        setState(() {
+          _verificationId = id; // تخزين الـ ID الحقيقي من فايربيس
+          _isOtpSent = true;
+          _isLoading = false;
+          startTimer();
+        });
+      },
+      onError: (err) {
+        setState(() {
+          _phoneError = err;
+          _isLoading = false;
+        });
+      },
+    );
   }
 
-  void _verifyOtpAndNavigate() {
+// داخل ForgotPasswordScreen
+  void _verifyOtpAndNavigate() async {
     String fullCode = _otpCode.join("");
-    if (fullCode == "123456") {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ProfilePage(
-            userEmail: _usePhone ? "966$_phoneNumber+" : _emailController.text.trim(),
-            loginProvider: _usePhone ? "phone" : "email", // أضيفي هذا السطر
-            canEditPassword: true,
-          ),
-        ),
-      );
-    } else {
+
+    if (fullCode.length != 6) {
       setState(() => _isOtpError = true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      // التحقق الفعلي مع فايربيس
+      final user = await _authService.signInWithOTP(_verificationId, fullCode);
+
+      if (user != null && mounted) {
+        // الآن user يحمل بيانات المستخدم الفعلي، والفايربيس يعتبره مسجل دخول
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProfilePage(
+              userEmail: user.email ?? "",
+              initialPhoneNumber: "+966$_phoneNumber",
+              loginProvider: "phone",
+              canEditPassword: true,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => _isOtpError = true); // يظهر "الرمز خاطئ" فقط إذا رفضه فايربيس
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 

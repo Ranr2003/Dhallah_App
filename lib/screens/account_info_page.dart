@@ -39,8 +39,15 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _emailController = TextEditingController(text: widget.userEmail);
-    _phoneController = TextEditingController(text: widget.initialPhoneNumber ?? "");
+    // إذا كان المزود هو البريد، نضع القيمة في كنترولر الإيميل، وإلا نتركه فارغاً ليجلب من Firestore
+    _emailController = TextEditingController(
+        text: widget.loginProvider == 'email' ? widget.userEmail : ""
+    );
+
+    _phoneController = TextEditingController(
+        text: widget.initialPhoneNumber?.replaceFirst('+966', '') ?? ""
+    );
+
     _fullPhoneNumber = widget.initialPhoneNumber ?? "";
     _loadUserData();
   }
@@ -49,6 +56,7 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       User? user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        // البحث في الداتابيس باستخدام الرقم التعريفي الفريد
         DocumentSnapshot doc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -58,12 +66,12 @@ class _ProfilePageState extends State<ProfilePage> {
           Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
           setState(() {
             _nameController.text = data['name'] ?? "";
-            if (data['phone'] != null && data['phone'] != "") {
-              // تنظيف الرقم للعرض في IntlPhoneField
-              _phoneController.text = data['phone'].replaceFirst(RegExp(r'^\+966'), '');
+            // عرض البيانات المخزنة مسبقاً
+            if (data['phone'] != null) {
+              _phoneController.text = data['phone'].replaceFirst('+966', '');
               _fullPhoneNumber = data['phone'];
             }
-            if (data['email'] != null && data['email'] != "") {
+            if (data['email'] != null) {
               _emailController.text = data['email'];
             }
           });
@@ -83,27 +91,28 @@ class _ProfilePageState extends State<ProfilePage> {
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
-      // تحديث البيانات في Firestore
+      // 1. تحديث كلمة السر في Firebase Auth (إذا كان مسموحاً له بالتعديل)
+      if (widget.canEditPassword && _passController.text.isNotEmpty) {
+        // هذا السطر يغير كلمة السر الفعلية للمستخدم في نظام الحماية
+        await FirebaseAuth.instance.currentUser!.updatePassword(_passController.text.trim());
+      }
+
+      // 2. تحديث البيانات في Firestore
       await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
         'name': _nameController.text.trim(),
         'phone': _fullPhoneNumber.trim(),
         'email': _emailController.text.trim(),
         'lastUpdate': FieldValue.serverTimestamp(),
-        'uid': currentUser.uid,
-        'provider': widget.loginProvider,
       }, SetOptions(merge: true));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم حفظ التعديلات في قاعدة البيانات بنجاح ✅"), backgroundColor: Colors.green),
+          const SnackBar(content: Text("تم تحديث كلمة السر والبيانات بنجاح ✅"), backgroundColor: Colors.green),
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("حدث خطأ أثناء الحفظ: $e"), backgroundColor: Colors.redAccent),
-        );
-      }
+      debugPrint("Error saving: $e");
+      // تنبيه: الفايربيس قد يطلب تسجيل دخول حديث (Recent Login) لتغيير كلمة السر
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -173,13 +182,15 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 15),
 
               // كلمة السر (مقفولة للتعديل المباشر كما طلبت)
+              // ابحث عن حقل كلمة السر واستبدله بهذا المنطق
               CustomInputField(
-                label: "كلمة السر",
-                hintText: "التعديل متاح عبر صفحة استعادة الحساب فقط",
+                label: "كلمة السر الجديدة",
+                hintText: widget.canEditPassword ? "أدخل كلمة السر الجديدة" : "التعديل متاح عبر الاستعادة فقط",
                 controller: _passController,
                 isPass: true,
-                readOnly: true, // مقفل تماماً
-                fillColor: Colors.grey.withOpacity(0.3),
+                // التعديل: الخانة تفتح فقط إذا كان canEditPassword = true
+                readOnly: !widget.canEditPassword,
+                fillColor: widget.canEditPassword ? Colors.white.withOpacity(0.7) : Colors.grey.withOpacity(0.3),
               ),
 
               const SizedBox(height: 35),
