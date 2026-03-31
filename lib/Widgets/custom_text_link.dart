@@ -1,3 +1,5 @@
+//custom_text_link.dart
+//Rand
 import 'package:flutter/material.dart';
 
 class CustomTextLink extends StatelessWidget {
