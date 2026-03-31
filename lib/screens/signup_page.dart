@@ -97,7 +97,7 @@ class _SignUpPageState extends State<SignUpPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset('assets/images/logo.jpeg', height: 70, fit: BoxFit.contain),
+                Image.asset('resourses/DallahAppLogo2.png', height: 70, fit: BoxFit.contain),
                 const SizedBox(height: 10),
                 const Text(
                   "تسجيل الحساب",

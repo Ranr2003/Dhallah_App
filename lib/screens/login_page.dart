@@ -304,7 +304,7 @@ class _LoginPageState extends State<LoginPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset('assets/images/logo.jpeg', height: 80, fit: BoxFit.contain),
+                Image.asset('resourses/DallahAppLogo2.png', height: 80, fit: BoxFit.contain),
                 const SizedBox(height: 15),
                 const Text("تسجيل الدخول", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
                 const Text("! هلابك من جديد ", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
