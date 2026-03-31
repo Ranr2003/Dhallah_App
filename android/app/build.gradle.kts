@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.dhallahapp"
+    namespace = "com.dhallah.app" // يجب أن يكون هكذا
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
