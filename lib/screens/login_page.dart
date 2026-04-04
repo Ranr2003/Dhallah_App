@@ -14,6 +14,8 @@ import '../screens/signup_page.dart';
 import '../screens/ForgotPassword_page.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../screens/home_page.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 // استيراد السيرفس الخاصة بك
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -261,21 +263,47 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
     try {
       final user = await _authService.login(_emailController.text.trim(), _passwordController.text.trim());
+
       if (user != null && mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProfilePage(
-              userEmail: _emailController.text.trim(),
-              loginProvider: "email",
+        // فحص حالة إكمال البيانات في Firestore
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        bool isComplete = false;
+        if (userDoc.exists) {
+          // نتأكد من وجود الحقل، إذا لم يوجد نعتبره false
+          var data = userDoc.data() as Map<String, dynamic>;
+          isComplete = data['isProfileComplete'] ?? false;
+        }
+
+        if (isComplete) {
+          // مستخدم قديم -> للهوم مباشرة
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomePage()),
+                (route) => false,
+          );
+        } else {
+          // مستخدم جديد -> لصفحة الملف الشخصي لإكمال بياناته
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProfilePage(
+                userEmail: _emailController.text.trim(),
+                loginProvider: "email",
+              ),
             ),
-          ),
-              (route) => false,
-        );
+                (route) => false,
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: Colors.redAccent));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text(e.toString().replaceAll("Exception:", "")),
+            backgroundColor: Colors.redAccent));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);

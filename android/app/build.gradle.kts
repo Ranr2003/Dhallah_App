@@ -10,7 +10,8 @@ plugins {
 
 android {
     namespace = "com.dhallah.app" // يجب أن يكون هكذا
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 34
+    //compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -27,8 +28,10 @@ android {
         applicationId = "com.dhallah.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        //minSdk = flutter.minSdkVersion
+        //targetSdk = flutter.targetSdkVersion
+        minSdk = 23    // أو النسخة التي تفضلها (عادة 21 أو 23)
+        targetSdk = 34
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

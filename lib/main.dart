@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-// 1. استيراد صفحتك الجديدة (تأكدي أن المسار مطابق لمجلدات الماستر)
+
+// استيراد الشاشات
+import 'screens/start_page.dart';
 import 'screens/login_page.dart';
+import 'screens/signup_page.dart';
+import 'screens/home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,50 +23,23 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Dhallah App',
-      debugShowCheckedModeBanner: false, // لمستك الخاصة لإخفاء شريط المطور
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFB293CD)),
         useMaterial3: true,
+        fontFamily: 'Cairo', // تأكدي من تعريف الخط في pubspec.yaml
       ),
-      // 2. هنا "التعديل السحري": نجعل التطبيق يبدأ من صفحتك أنتِ
-      home: const LoginPage(),
-    );
-  }
-}
 
-// 3. اتركي هذا الكود (MyHomePage) كما هو في أسفل الملف
-// ميزة وجوده: أنه لن يختفي، وإذا احتجتِ مستقبلاً الانتقال له من صفحة التسجيل سيكون متاحاً.
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-  final String title;
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
+      // 1. تحديد الصفحة التي يبدأ منها التطبيق (البداية)
+      initialRoute: '/',
 
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-  void _incrementCounter() => setState(() => _counter++);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Firebase is Connected!'),
-            Text('$_counter', style: Theme.of(context).textTheme.headlineMedium),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        child: const Icon(Icons.add),
-      ),
+      // 2. تعريف جدول المسارات
+      routes: {
+        '/': (context) => const StartPage(),
+        '/login': (context) => const LoginPage(),
+        '/signup': (context) => const SignUpPage(),
+        '/home': (context) => const HomePage(),
+      },
     );
   }
 }
