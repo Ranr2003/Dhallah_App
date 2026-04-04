@@ -1,38 +1,41 @@
-//authentication_serv.dart
+// authentication_serv.dart
 // Rand - Full Authentication Service (Email, Phone, & Google)
+// تم التحديث لمنع تكرار البريد الإلكتروني ورقم الجوال في قاعدة البيانات
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class AuthenticationService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // --- 1. تسجيل الدخول بجوجل (Google Sign-In) ---
+  // --- 1. تسجيل الدخول بجوجل ---
   Future<User?> signInWithGoogle() async {
     try {
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth =
-      await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      User? currentUser = _auth.currentUser;
+      UserCredential result = await _auth.signInWithCredential(credential);
+      User? user = result.user;
 
-      if (currentUser != null) {
-        // ربط قوقل بالحساب الحالي
-        UserCredential result =
-        await currentUser.linkWithCredential(credential);
-        return result.user;
-      } else {
-        // تسجيل دخول طبيعي
-        UserCredential result =
-        await _auth.signInWithCredential(credential);
-        return result.user;
+      if (user != null) {
+        // حفظ بيانات مستخدم جوجل إذا كان جديداً مع دمج البيانات
+        await _firestore.collection('users').doc(user.uid).set({
+          'name': user.displayName ?? "مستخدم جوجل",
+          'email': user.email,
+          'lastUpdate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
       }
+      return user;
     } catch (e) {
       print("خطأ في دخول قوقل: $e");
       rethrow;
@@ -49,18 +52,15 @@ class AuthenticationService {
 
       if (user != null && !user.emailVerified) {
         await logout();
-        throw Exception(
-            "الرجاء تفعيل حسابك عبر الرابط المرسل إلى بريدك الإلكتروني أولاً.");
+        throw Exception("الرجاء تفعيل حسابك عبر الرابط المرسل إلى بريدك الإلكتروني أولاً.");
       }
-
       return user;
     } on FirebaseAuthException catch (e) {
-      print("خطأ في تسجيل الدخول: ${e.message}");
       rethrow;
     }
   }
 
-  // --- 3. تسجيل مستخدم جديد ---
+  // --- 3. تسجيل مستخدم جديد (مع منع تكرار البريد) ---
   Future<User?> register({
     required String username,
     required String email,
@@ -70,6 +70,16 @@ class AuthenticationService {
     try {
       if (password != confirmPassword) {
         throw Exception("كلمتا المرور غير متطابقتين!");
+      }
+
+      // ** فحص Firestore للتأكد من أن البريد غير مستخدم مسبقاً **
+      final emailCheck = await _firestore
+          .collection('users')
+          .where('email', isEqualTo: email.trim())
+          .get();
+
+      if (emailCheck.docs.isNotEmpty) {
+        throw Exception("هذا البريد الإلكتروني مسجل بالفعل بحساب آخر.");
       }
 
       if (!validatePassword(password)) {
@@ -83,10 +93,18 @@ class AuthenticationService {
 
       if (user != null) {
         await user.updateDisplayName(username);
+
+        // حفظ البيانات الأساسية في Firestore
+        await _firestore.collection('users').doc(user.uid).set({
+          'name': username,
+          'email': email,
+          'isProfileComplete': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
         await user.sendEmailVerification();
         await logout();
       }
-
       return user;
     } catch (e) {
       print("خطأ في التسجيل: $e");
@@ -94,35 +112,26 @@ class AuthenticationService {
     }
   }
 
-  // --- 4. التحقق من رقم الجوال ---
+  // --- 4. التحقق من رقم الجوال (مع منع تكرار الرقم) ---
+  // --- 4. التحقق من رقم الجوال (للدخول الصريح) ---
   Future<void> verifyPhoneNumber({
     required String phoneNumber,
     required Function(String verificationId) onCodeSent,
     required Function(String error) onError,
   }) async {
     try {
+      // أزلنا الفحص من هنا لنسمح للمستخدم المسجل مسبقاً بالدخول
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
-
         verificationCompleted: (PhoneAuthCredential credential) async {
-          User? currentUser = _auth.currentUser;
-
-          if (currentUser != null) {
-            // ربط الجوال بالحساب الحالي
-            await currentUser.linkWithCredential(credential);
-          } else {
-            await _auth.signInWithCredential(credential);
-          }
+          await _auth.signInWithCredential(credential);
         },
-
         verificationFailed: (FirebaseAuthException e) {
           onError(e.message ?? "حدث خطأ في التحقق");
         },
-
         codeSent: (String verificationId, int? resendToken) {
           onCodeSent(verificationId);
         },
-
         codeAutoRetrievalTimeout: (String verificationId) {},
       );
     } catch (e) {
@@ -137,26 +146,14 @@ class AuthenticationService {
         verificationId: verificationId,
         smsCode: smsCode,
       );
-
-      User? currentUser = _auth.currentUser;
-
-      if (currentUser != null) {
-        // ربط الجوال بالحساب الحالي
-        UserCredential result =
-        await currentUser.linkWithCredential(credential);
-        return result.user;
-      } else {
-        // تسجيل دخول طبيعي
-        UserCredential result =
-        await _auth.signInWithCredential(credential);
-        return result.user;
-      }
+      UserCredential result = await _auth.signInWithCredential(credential);
+      return result.user;
     } catch (e) {
       throw Exception("كود التحقق غير صحيح");
     }
   }
 
-  // --- 5. وظائف إضافية ---
+  // --- وظائف مساعدة ---
   bool validatePassword(String password) => password.length >= 6;
 
   Future<void> logout() async {
@@ -167,7 +164,7 @@ class AuthenticationService {
   Future<void> resetPassword(String email) async {
     await _auth.sendPasswordResetEmail(email: email);
   }
-  // --- دالة تحديث كلمة السر ---
+
   Future<void> updatePassword(String newPassword) async {
     try {
       User? user = _auth.currentUser;

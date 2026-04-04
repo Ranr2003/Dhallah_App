@@ -1,14 +1,12 @@
-//signup_page.dart
-//Rand
+// signup_page.dart
+// Rand
 import 'package:dhallah_app/services/authentication_serv.dart';
 import 'package:flutter/material.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
-import'../Widgets/custom_text_field.dart';
-import'../widgets/custom_text_link.dart';
-import 'package:flutter/gestures.dart';
+import '../Widgets/custom_text_field.dart';
+import '../widgets/custom_text_link.dart';
 import '../screens/login_page.dart';
-// استيراد السيرفس الخاصة بك
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -37,9 +35,11 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   void _handleSignUp() async {
+    // التحقق من الحقول
     if (_emailController.text.isEmpty ||
         _passwordController.text.isEmpty ||
-        _usernameController.text.isEmpty) {
+        _usernameController.text.isEmpty ||
+        _confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")),
       );
@@ -57,15 +57,29 @@ class _SignUpPageState extends State<SignUpPage> {
       );
 
       if (user != null && mounted) {
+        // إظهار رسالة نجاح وتوجيه لتفعيل الإيميل
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم إنشاء الحساب بنجاح!")),
+          const SnackBar(
+            content: Text("تم إنشاء الحساب! تفقد بريدك الإلكتروني لتفعيل الحساب."),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 4),
+          ),
         );
-        Navigator.pop(context);
+
+        // التوجيه لصفحة تسجيل الدخول بدلاً من البروفايل
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const LoginPage()),
+              (route) => false,
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("خطأ في التسجيل: ${e.toString()}")),
+          SnackBar(
+            content: Text(e.toString().replaceAll("Exception:", "")),
+            backgroundColor: Colors.redAccent,
+          ),
         );
       }
     } finally {
@@ -109,7 +123,6 @@ class _SignUpPageState extends State<SignUpPage> {
                 ),
                 const SizedBox(height: 25),
 
-                // استخدام الـ InputField الموحد
                 CustomInputField(
                   label: "الاسم الكامل",
                   hintText: "أدخل اسمك الثلاثي",
@@ -147,7 +160,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
                 const SizedBox(height: 20),
 
-                // استخدام الـ TextLink الموحد
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

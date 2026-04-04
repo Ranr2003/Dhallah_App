@@ -1,7 +1,10 @@
+// home_page.dart
+// تم التعديل بواسطة رند بدعم Gemini (إضافة قراءة طريقة الدخول المحفوظة وتمريرها للبروفايل)
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // استيراد ضروري
 import '../widgets/login_signup_background.dart';
 import 'lost_report_page.dart';
 import 'account_info_page.dart';
@@ -19,7 +22,6 @@ class _HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String userName = "زائر";
 
-  // تعريف الألوان كـ static لضمان وصول الدوال إليها بدون أخطاء undefined
   static const Color dustyPurple = Color(0xFF9681A8);
   static const Color dustyPurpleLight = Color(0xFFDED6E6);
 
@@ -46,6 +48,32 @@ class _HomePageState extends State<HomePage> {
       }
     } catch (e) {
       debugPrint("خطأ في جلب اسم المستخدم: $e");
+    }
+  }
+
+  // دالة ذكية لفتح صفحة البروفايل بناءً على البيانات المحفوظة
+  void _navigateToProfile() async {
+    final prefs = await SharedPreferences.getInstance();
+    // قراءة الطريقة المحفوظة (إذا لم توجد نستخدم المنطق الافتراضي لفايربيس كخطة بديلة)
+    String? savedMethod = prefs.getString('loginMethod');
+
+    User? user = FirebaseAuth.instance.currentUser;
+
+    // منطق احتياطي في حال لم يجد القيمة المحفوظة (مثلاً أول مرة بعد التحديث)
+    String finalProvider = savedMethod ?? (user?.providerData.any((p) => p.providerId == 'password') == true ? 'email' : 'google');
+
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ProfilePage(
+            userEmail: user?.email ?? user?.phoneNumber ?? "",
+            loginProvider: finalProvider,
+            canEditPassword: finalProvider == 'email',
+            initialName: userName,
+          ),
+        ),
+      );
     }
   }
 
@@ -132,13 +160,11 @@ class _HomePageState extends State<HomePage> {
 
                               return Dismissible(
                                 key: Key(doc.id),
-                                direction: DismissDirection.endToStart, // السحب من اليمين لليسار
+                                direction: DismissDirection.endToStart,
                                 confirmDismiss: (direction) async {
-                                  // رسالة تأكيد الحذف
                                   return await _showDeleteConfirmation(context);
                                 },
                                 onDismissed: (direction) {
-                                  // الحذف الفعلي من الداتابيس
                                   doc.reference.delete();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(content: Text("تم حذف البلاغ بنجاح", style: TextStyle(fontFamily: 'Cairo'))),
@@ -155,7 +181,7 @@ class _HomePageState extends State<HomePage> {
                                   child: const Icon(Icons.delete_outline, color: Colors.white, size: 30),
                                 ),
                                 child: InkWell(
-                                  onTap: () => _showReportDetails(context, data, isLost), // عند الضغط يعرض التفاصيل
+                                  onTap: () => _showReportDetails(context, data, isLost),
                                   child: _buildReportCard(
                                     data['category'] ?? 'غرض',
                                     data['description'] ?? 'لا يوجد وصف',
@@ -201,10 +227,8 @@ class _HomePageState extends State<HomePage> {
             )
           ],
         ),
-
         Image.asset('resourses/DallahAppLogo2.png', height: 45,
             errorBuilder: (context, error, stackTrace) => const Icon(Icons.apps)),
-
         IconButton(
           icon: const Icon(Icons.menu_rounded, size: 30, color: Color(0xFF5A4A75)),
           onPressed: () {
@@ -220,7 +244,6 @@ class _HomePageState extends State<HomePage> {
       backgroundColor: Colors.white,
       child: Column(
         children: [
-          // الهيدر الإبداعي الجديد بالتدرج البنفسجي الباهت
           Container(
             width: double.infinity,
             height: 140,
@@ -228,38 +251,24 @@ class _HomePageState extends State<HomePage> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  dustyPurple.withOpacity(0.2),
-                  Colors.white.withOpacity(0.0),
-                ],
+                colors: [dustyPurple.withOpacity(0.2), Colors.white.withOpacity(0.0)],
               ),
             ),
-            child: const SafeArea(
-              child: Center(
-                child: Icon(Icons.blur_on_rounded, color: dustyPurple, size: 50),
-              ),
-            ),
+            child: const SafeArea(child: Center(child: Icon(Icons.blur_on_rounded, color: dustyPurple, size: 50))),
           ),
-
           const SizedBox(height: 10),
-
-          _buildDrawerItem(Icons.support_agent_rounded, 'الدعم الفني', dustyPurple, () {
-            Navigator.pop(context);
-          }),
-
-          _buildDrawerItem(Icons.privacy_tip_outlined, 'سياسة الخصوصية', dustyPurple, () {
-            Navigator.pop(context);
-          }),
-
+          _buildDrawerItem(Icons.support_agent_rounded, 'الدعم الفني', dustyPurple, () => Navigator.pop(context)),
+          _buildDrawerItem(Icons.privacy_tip_outlined, 'سياسة الخصوصية', dustyPurple, () => Navigator.pop(context)),
           const Spacer(),
           const Divider(indent: 20, endIndent: 20, color: Color(0xFFEEEEEE)),
-
           _buildDrawerItem(
             Icons.logout_rounded,
             'تسجيل الخروج',
             Colors.redAccent,
                 () async {
               await FirebaseAuth.instance.signOut();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('loginMethod'); // مسح الطريقة عند تسجيل الخروج
               if (mounted) {
                 Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
               }
@@ -275,15 +284,7 @@ class _HomePageState extends State<HomePage> {
     return ListTile(
       splashColor: dustyPurpleLight.withOpacity(0.3),
       leading: Icon(icon, color: itemColor, size: 24),
-      title: Text(
-          title,
-          style: TextStyle(
-              fontFamily: 'Cairo',
-              fontWeight: FontWeight.w600,
-              color: itemColor == Colors.redAccent ? Colors.redAccent : Colors.black87,
-              fontSize: 16
-          )
-      ),
+      title: Text(title, style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w600, color: itemColor == Colors.redAccent ? Colors.redAccent : Colors.black87, fontSize: 16)),
       trailing: Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey.withOpacity(0.5)),
       onTap: onTap,
     );
@@ -328,15 +329,9 @@ class _HomePageState extends State<HomePage> {
           children: [
             const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFFB293CD), size: 26),
             _buildActiveHomeIcon(),
+            // تعديل النقر على أيقونة البروفايل هنا
             InkWell(
-              onTap: () {
-                User? user = FirebaseAuth.instance.currentUser;
-                Navigator.push(context, MaterialPageRoute(builder: (context) => ProfilePage(
-                  userEmail: user?.email ?? "",
-                  loginProvider: user?.providerData.isNotEmpty == true && user?.providerData.first.providerId == 'password' ? 'email' : 'google',
-                  canEditPassword: user?.providerData.isNotEmpty == true && user?.providerData.first.providerId == 'password',
-                )));
-              },
+              onTap: _navigateToProfile,
               child: const Icon(Icons.person_outline_rounded, color: Color(0xFFB293CD), size: 28),
             ),
           ],
@@ -413,44 +408,26 @@ class _HomePageState extends State<HomePage> {
             insetPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 30),
             child: Container(
               width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(30),
-              ),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(30)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const SizedBox(height: 15),
-                  // مقبض علوي بسيط
                   Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-
                   const SizedBox(height: 10),
-
-                  // التبويبات (Menu)
                   const TabBar(
                     indicatorColor: Color(0xFFB293CD),
                     indicatorWeight: 3,
                     labelColor: Color(0xFF5A4A75),
                     unselectedLabelColor: Colors.grey,
                     labelStyle: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 16),
-                    tabs: [
-                      Tab(text: "ضيعت شي؟"),
-                      Tab(text: "لقيت شي؟"),
-                    ],
+                    tabs: [Tab(text: "ضيعت شي؟"), Tab(text: "لقيت شي؟")],
                   ),
-
                   const Divider(height: 1, color: Color(0xFFEEEEEE)),
-
-                  // محتوى التبويبات
                   Flexible(
                     child: SizedBox(
-                      height: MediaQuery.of(context).size.height * 0.75, // طول النافذة
-                      child: const TabBarView(
-                        children: [
-                          LostReportPage(),
-                          FoundReportPage(),
-                        ],
-                      ),
+                      height: MediaQuery.of(context).size.height * 0.75,
+                      child: const TabBarView(children: [LostReportPage(), FoundReportPage()]),
                     ),
                   ),
                 ],
@@ -461,6 +438,7 @@ class _HomePageState extends State<HomePage> {
       },
     );
   }
+
   Future<bool?> _showDeleteConfirmation(BuildContext context) {
     return showDialog<bool>(
       context: context,
@@ -469,22 +447,15 @@ class _HomePageState extends State<HomePage> {
         title: const Text("تأكيد الحذف", textAlign: TextAlign.right, style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
         content: const Text("هل أنت متأكد من رغبتك في حذف هذا البلاغ نهائياً؟", textAlign: TextAlign.right, style: TextStyle(fontFamily: 'Cairo')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text("إلغاء", style: TextStyle(fontFamily: 'Cairo', color: Colors.grey)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text("حذف", style: TextStyle(fontFamily: 'Cairo', color: Colors.redAccent)),
-          ),
+          TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text("إلغاء", style: TextStyle(fontFamily: 'Cairo', color: Colors.grey))),
+          TextButton(onPressed: () => Navigator.of(context).pop(true), child: const Text("حذف", style: TextStyle(fontFamily: 'Cairo', color: Colors.redAccent))),
         ],
       ),
     );
   }
-  void _showReportDetails(BuildContext context, Map<String, dynamic> data, bool isLost) {
-    // استخراج بيانات الـ item
-    final itemData = data['item'] as Map<String, dynamic>? ?? {};
 
+  void _showReportDetails(BuildContext context, Map<String, dynamic> data, bool isLost) {
+    final itemData = data['item'] as Map<String, dynamic>? ?? {};
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -493,42 +464,21 @@ class _HomePageState extends State<HomePage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // خط علوي بسيط للتزيين
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
             const SizedBox(height: 20),
-
-            Text(
-              isLost ? "تفاصيل المفقود" : "تفاصيل المعثور عليه",
-              style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF5A4A75)),
-            ),
+            Text(isLost ? "تفاصيل المفقود" : "تفاصيل المعثور عليه", style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF5A4A75))),
             const Divider(height: 30),
-
-            // عرض البيانات بتنسيق (العنوان : القيمة)
             _buildDetailRow("النوع", itemData['category'] ?? "غير محدد"),
             _buildDetailRow("اللون", itemData['color'] ?? "غير محدد"),
             _buildDetailRow("علامات فارقة", itemData['uniqueFeatures'] ?? "لا توجد"),
             _buildDetailRow("الوصف", itemData['description'] ?? "لا يوجد وصف"),
-
             const SizedBox(height: 30),
-
-            // زر عرض التطابق
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFB293CD),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  elevation: 0,
-                ),
-                onPressed: () {
-                  Navigator.pop(context);
-                  // هنا يتم الربط مع صفحة نتائج الذكاء الاصطناعي لاحقاً
-                },
-                child: const Text(
-                  "عرض التطابق الذكي",
-                  style: TextStyle(fontFamily: 'Cairo', color: Colors.white, fontWeight: FontWeight.bold),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB293CD), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)), padding: const EdgeInsets.symmetric(vertical: 14), elevation: 0),
+                onPressed: () => Navigator.pop(context),
+                child: const Text("عرض التطابق الذكي", style: TextStyle(fontFamily: 'Cairo', color: Colors.white, fontWeight: FontWeight.bold)),
               ),
             ),
           ],
@@ -537,44 +487,15 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // ودجت مساعد يعرض (العنوان : القيمة) من اليمين لليسار بشكل موحد
   Widget _buildDetailRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          // القيمة تظهر على اليسار
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontFamily: 'Cairo', fontSize: 14, color: Colors.black87),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-            ),
-          ),
+          Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontFamily: 'Cairo', fontSize: 14, color: Colors.black87), overflow: TextOverflow.ellipsis, maxLines: 2)),
           const SizedBox(width: 5),
-          // العنوان يظهر على اليمين مع النقطتين
-          Text(
-            "$label :",
-            style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: Color(0xFF5A4A75), fontSize: 14),
-            textDirection: TextDirection.rtl,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _detailRow(String title, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          Text(value, style: const TextStyle(fontFamily: 'Cairo', fontSize: 14)),
-          const SizedBox(width: 10),
-          Text(title, style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: Colors.grey)),
+          Text("$label :", style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, color: Color(0xFF5A4A75), fontSize: 14), textDirection: TextDirection.rtl),
         ],
       ),
     );
