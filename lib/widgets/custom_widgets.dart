@@ -47,6 +47,7 @@ class ReportPageHeader extends StatelessWidget {
 // ══════════════════════════════════════════════
 
 // Renders a bold label above a form field with consistent vertical spacing.
+// Renders a bold label above a form field with consistent vertical spacing.
 class FieldLabel extends StatelessWidget {
   final String text;
 
@@ -56,12 +57,19 @@ class FieldLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(top: AppDimens.spaceMd, bottom: 5),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: AppDimens.fontMd,
-          color: AppColors.textPrimary,
+      // استخدمنا SizedBox.expand أو عرض كامل لضمان السيطرة على المحاذاة
+      child: Container(
+        width: double.infinity, // يجبر الحاوية على أخذ عرض الشاشة كاملاً
+        alignment: Alignment.centerRight, // يحاذي ما بداخله لليمين تماماً
+        child: Text(
+          text,
+          textAlign: TextAlign.right, // تأكيد إضافي للمحاذاة داخل النص نفسه
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: AppDimens.fontMd,
+            fontFamily: 'Cairo', // تأكدي من إضافة الخط هنا أيضاً
+            color: AppColors.textPrimary,
+          ),
         ),
       ),
     );
@@ -146,12 +154,19 @@ class LocationPickerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton.icon(
-      onPressed: onTap,
-      icon: const Icon(Icons.location_on_outlined, color: AppColors.primary, size: 18),
-      label: const Text(
-        'تحديد الموقع من الخريطة',
-        style: TextStyle(color: AppColors.primary, fontSize: AppDimens.fontMd),
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.location_on_outlined, size: 18, color: AppColors.primary),
+        label: const Text(
+          'تحديد الموقع من الخريطة',
+          style: TextStyle(
+            fontFamily: 'Cairo',
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
     );
   }

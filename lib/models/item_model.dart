@@ -1,6 +1,5 @@
 // lib/models/item_model.dart
 
-
 class Item {
   String category;
   String description;
@@ -37,28 +36,5 @@ class Item {
       imageURL: map['imageURL'] ?? '',
       uniqueFeatures: map['uniqueFeatures'] ?? '',
     );
-  }
-
-  /// Updates only the provided fields, leaving the rest unchanged.
-  void updateItemInfo({
-    String? category,
-    String? description,
-    String? color,
-    String? imageURL,
-    String? uniqueFeatures,
-  }) {
-    if (category != null) this.category = category;
-    if (description != null) this.description = description;
-    if (color != null) this.color = color;
-    if (imageURL != null) this.imageURL = imageURL;
-    if (uniqueFeatures != null) this.uniqueFeatures = uniqueFeatures;
-  }
-
-  /// Returns [true] if all required fields are properly filled.
-  bool get validateItem {
-    return category.isNotEmpty &&
-        description.length > 5 &&
-        uniqueFeatures.isNotEmpty &&
-        imageURL.isNotEmpty;
   }
 }
