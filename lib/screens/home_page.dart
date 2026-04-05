@@ -15,6 +15,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
+
 class _HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String userName = "زائر";
@@ -306,7 +307,7 @@ class _HomePageState extends State<HomePage> {
     return Container(
       decoration: BoxDecoration(color: const Color(0xFFB293CD).withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
       child: TextButton.icon(
-        onPressed: () => _showReportOptions(context),
+        onPressed: () => _openReportSheet(context), // reem
         icon: const Icon(Icons.add_circle_outline, color: Color(0xFF5A4A75), size: 20),
         label: const Text("بلاغ جديد", style: TextStyle(color: Color(0xFF5A4A75), fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
       ),
@@ -580,3 +581,55 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
+
+
+//reem
+void _openReportSheet(BuildContext context) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) => const _ReportSheetContent(),
+  );
+}
+//reem
+class _ReportSheetContent extends StatelessWidget {
+  const _ReportSheetContent();
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: 2,
+      initialIndex: 1,
+      child: Directionality(
+        textDirection: TextDirection.rtl,
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.85,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+              ),
+              const TabBar(
+                indicatorColor: Color(0xFFB293CD),
+                labelColor: Color(0xFF5A4A75),
+                unselectedLabelColor: Colors.grey,
+                labelStyle: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+                tabs: [Tab(text: "لقيت شي؟"), Tab(text: "ضيعت شي؟")],
+              ),
+              const Expanded(
+                child: TabBarView(children: [FoundReportPage(), LostReportPage()]),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
