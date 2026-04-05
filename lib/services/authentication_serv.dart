@@ -1,7 +1,5 @@
 // authentication_serv.dart
-// Rand - Full Authentication Service (Email, Phone, & Google)
-// تم التحديث لمنع تكرار البريد الإلكتروني ورقم الجوال في قاعدة البيانات
-
+// Rand - Full Authentication Service (Email, Phone, & Google with Smart Linking)
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -11,56 +9,79 @@ class AuthenticationService {
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // --- 1. تسجيل الدخول بجوجل ---
+  // --- حفظ/تحديث المستخدم في Firestore ---
+  // نستخدم merge: true لضمان عدم مسح البيانات القديمة
+  Future<void> _saveUserData(User user) async {
+    await _firestore.collection('users').doc(user.uid).set({
+      'name': user.displayName ?? "مستخدم",
+      'email': user.email,
+      'phone': user.phoneNumber, // سيتم تخزينه هنا تلقائياً بعد نجاح الربط
+      'lastUpdate': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  // --- 1. تسجيل الدخول بجوجل (مع الربط التلقائي) ---
   Future<User?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-
+      final googleAuth = await googleUser.authentication;
       final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      UserCredential result = await _auth.signInWithCredential(credential);
-      User? user = result.user;
+      User? currentUser = _auth.currentUser;
 
-      if (user != null) {
-        // حفظ بيانات مستخدم جوجل إذا كان جديداً مع دمج البيانات
-        await _firestore.collection('users').doc(user.uid).set({
-          'name': user.displayName ?? "مستخدم جوجل",
-          'email': user.email,
-          'lastUpdate': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+      if (currentUser != null) {
+        try {
+          final result = await currentUser.linkWithCredential(credential);
+          await _saveUserData(result.user!);
+          return result.user;
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'credential-already-in-use') {
+            final result = await _auth.signInWithCredential(credential);
+            await _saveUserData(result.user!);
+            return result.user;
+          } else {
+            throw Exception(e.message);
+          }
+        }
+      } else {
+        final result = await _auth.signInWithCredential(credential);
+        await _saveUserData(result.user!);
+        return result.user;
       }
-      return user;
     } catch (e) {
       print("خطأ في دخول قوقل: $e");
       rethrow;
     }
   }
 
-  // --- 2. تسجيل دخول (إيميل مع التحقق من التفعيل) ---
+  // --- 2. تسجيل دخول بالإيميل ---
   Future<User?> login(String email, String password) async {
     try {
-      UserCredential result = await _auth.signInWithEmailAndPassword(
+      final result = await _auth.signInWithEmailAndPassword(
           email: email, password: password);
 
       User? user = result.user;
+      await user?.reload();
+      user = _auth.currentUser;
 
       if (user != null && !user.emailVerified) {
         await logout();
-        throw Exception("الرجاء تفعيل حسابك عبر الرابط المرسل إلى بريدك الإلكتروني أولاً.");
+        throw Exception("الرجاء تفعيل البريد الإلكتروني أولاً.");
       }
+
+      await _saveUserData(user!);
       return user;
     } on FirebaseAuthException catch (e) {
-      rethrow;
+      throw Exception(e.message);
     }
   }
 
-  // --- 3. تسجيل مستخدم جديد (مع منع تكرار البريد) ---
+  // --- 3. تسجيل مستخدم جديد ---
   Future<User?> register({
     required String username,
     required String email,
@@ -68,85 +89,80 @@ class AuthenticationService {
     required String confirmPassword,
   }) async {
     try {
-      if (password != confirmPassword) {
-        throw Exception("كلمتا المرور غير متطابقتين!");
-      }
+      if (password != confirmPassword) throw Exception("كلمتا المرور غير متطابقتين!");
+      if (!validatePassword(password)) throw Exception("كلمة المرور يجب أن تكون 6 خانات على الأقل");
 
-      // ** فحص Firestore للتأكد من أن البريد غير مستخدم مسبقاً **
-      final emailCheck = await _firestore
-          .collection('users')
-          .where('email', isEqualTo: email.trim())
-          .get();
-
-      if (emailCheck.docs.isNotEmpty) {
-        throw Exception("هذا البريد الإلكتروني مسجل بالفعل بحساب آخر.");
-      }
-
-      if (!validatePassword(password)) {
-        throw Exception("كلمة المرور يجب أن تكون 6 خانات على الأقل");
-      }
-
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
-          email: email, password: password);
-
+      final result = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       User? user = result.user;
 
       if (user != null) {
         await user.updateDisplayName(username);
-
-        // حفظ البيانات الأساسية في Firestore
-        await _firestore.collection('users').doc(user.uid).set({
-          'name': username,
-          'email': email,
-          'isProfileComplete': false,
-          'createdAt': FieldValue.serverTimestamp(),
-        });
-
+        await _saveUserData(user);
         await user.sendEmailVerification();
-        await logout();
       }
       return user;
     } catch (e) {
-      print("خطأ في التسجيل: $e");
       rethrow;
     }
   }
 
-  // --- 4. التحقق من رقم الجوال (مع منع تكرار الرقم) ---
-  // --- 4. التحقق من رقم الجوال (للدخول الصريح) ---
+  // --- 4. إرسال كود التحقق (للدخول أو للربط من البروفايل) ---
   Future<void> verifyPhoneNumber({
     required String phoneNumber,
     required Function(String verificationId) onCodeSent,
     required Function(String error) onError,
   }) async {
     try {
-      // أزلنا الفحص من هنا لنسمح للمستخدم المسجل مسبقاً بالدخول
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
         verificationCompleted: (PhoneAuthCredential credential) async {
-          await _auth.signInWithCredential(credential);
+          // التحقق التلقائي (في بعض أجهزة أندرويد)
+          User? user = _auth.currentUser;
+          if (user != null) {
+            await user.linkWithCredential(credential);
+            await _saveUserData(user);
+          }
         },
-        verificationFailed: (FirebaseAuthException e) {
-          onError(e.message ?? "حدث خطأ في التحقق");
-        },
-        codeSent: (String verificationId, int? resendToken) {
-          onCodeSent(verificationId);
-        },
-        codeAutoRetrievalTimeout: (String verificationId) {},
+        verificationFailed: (FirebaseAuthException e) => onError(e.message ?? "حدث خطأ"),
+        codeSent: (verificationId, resendToken) => onCodeSent(verificationId),
+        codeAutoRetrievalTimeout: (verificationId) {},
       );
     } catch (e) {
       onError(e.toString());
     }
   }
 
-  // --- تسجيل الدخول بالكود OTP ---
-  Future<User?> signInWithOTP(String verificationId, String smsCode) async {
+  // --- 5. دالة الربط النهائية (تستخدم في البروفايل) ---
+  Future<void> linkPhoneNumber(String verificationId, String smsCode) async {
     try {
-      AuthCredential credential = PhoneAuthProvider.credential(
+      final credential = PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: smsCode,
       );
-      UserCredential result = await _auth.signInWithCredential(credential);
+
+      User? user = _auth.currentUser;
+      if (user != null) {
+        // نربط الرقم بالحساب الحالي (الإيميل) لتوحيد الـ UID
+        final result = await user.linkWithCredential(credential);
+        await _saveUserData(result.user!);
+      }
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'credential-already-in-use') {
+        throw Exception("هذا الرقم مرتبط بحساب آخر بالفعل.");
+      }
+      throw Exception("كود التحقق غير صحيح");
+    }
+  }
+
+  // --- 6. تسجيل الدخول العادي بالـ OTP (في حال لم يكن هناك حساب حالي) ---
+  Future<User?> signInWithOTP(String verificationId, String smsCode) async {
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: verificationId,
+        smsCode: smsCode,
+      );
+      final result = await _auth.signInWithCredential(credential);
+      await _saveUserData(result.user!);
       return result.user;
     } catch (e) {
       throw Exception("كود التحقق غير صحيح");
@@ -159,25 +175,5 @@ class AuthenticationService {
   Future<void> logout() async {
     await _googleSignIn.signOut();
     await _auth.signOut();
-  }
-
-  Future<void> resetPassword(String email) async {
-    await _auth.sendPasswordResetEmail(email: email);
-  }
-
-  Future<void> updatePassword(String newPassword) async {
-    try {
-      User? user = _auth.currentUser;
-      if (user != null) {
-        await user.updatePassword(newPassword);
-      } else {
-        throw Exception("لا يوجد مستخدم مسجل دخول حالياً");
-      }
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'requires-recent-login') {
-        throw Exception("يرجى تسجيل الخروج والدخول مجدداً لتحديث كلمة السر.");
-      }
-      throw Exception("خطأ في تحديث كلمة السر: ${e.message}");
-    }
   }
 }

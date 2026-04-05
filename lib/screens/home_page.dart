@@ -54,13 +54,11 @@ class _HomePageState extends State<HomePage> {
   // دالة ذكية لفتح صفحة البروفايل بناءً على البيانات المحفوظة
   void _navigateToProfile() async {
     final prefs = await SharedPreferences.getInstance();
-    // قراءة الطريقة المحفوظة (إذا لم توجد نستخدم المنطق الافتراضي لفايربيس كخطة بديلة)
     String? savedMethod = prefs.getString('loginMethod');
-
     User? user = FirebaseAuth.instance.currentUser;
 
-    // منطق احتياطي في حال لم يجد القيمة المحفوظة (مثلاً أول مرة بعد التحديث)
-    String finalProvider = savedMethod ?? (user?.providerData.any((p) => p.providerId == 'password') == true ? 'email' : 'google');
+    String finalProvider = savedMethod ??
+        (user?.providerData.any((p) => p.providerId == 'password') == true ? 'email' : 'google');
 
     if (mounted) {
       Navigator.push(
@@ -69,7 +67,8 @@ class _HomePageState extends State<HomePage> {
           builder: (context) => ProfilePage(
             userEmail: user?.email ?? user?.phoneNumber ?? "",
             loginProvider: finalProvider,
-            canEditPassword: finalProvider == 'email',
+            // التعديل هنا: اجعليها false دائماً عند الدخول من الهوم
+            canEditPassword: false,
             initialName: userName,
           ),
         ),
