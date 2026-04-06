@@ -1,14 +1,15 @@
-//login_page.dart
-//Rand
-import 'dart:async'; // ضروري جداً للتايمر
+// login_page.dart
+// تم التعديل بواسطة رند بدعم Gemini (إضافة الفحص الذكي لحالة الحساب وتوجيه المستخدم الجديد)
+import 'dart:async';
 import 'package:dhallah_app/screens/account_info_page.dart';
 import 'package:dhallah_app/services/authentication_serv.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
-import'../Widgets/custom_text_field.dart';
-import'../widgets/custom_text_link.dart';
+import '../widgets/custom_text_field.dart';
+import '../widgets/custom_text_link.dart';
 import 'package:flutter/gestures.dart';
 import '../screens/signup_page.dart';
 import '../screens/ForgotPassword_page.dart';
@@ -16,7 +17,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../screens/home_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-// استيراد السيرفس الخاصة بك
+
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -34,9 +35,9 @@ class _LoginPageState extends State<LoginPage> {
   // --- متغيرات الجوال والتايمر والـ OTP ---
   bool isCodeSent = false;
   String _phoneNumber = "";
-  String _fullPhoneNumber = ""; // لتخزين الرقم بالصيغة الدولية
+  String _fullPhoneNumber = "";
   String? _phoneError;
-  String _verificationId = ""; // مهم جداً لفايربيس
+  String _verificationId = "";
   List<String> _otpCode = ["", "", "", "", "", ""];
   bool _isOtpError = false;
 
@@ -50,6 +51,50 @@ class _LoginPageState extends State<LoginPage> {
     _passwordController.dispose();
     _timer?.cancel();
     super.dispose();
+  }
+
+  // دالة مساعدة لحفظ طريقة الدخول في ذاكرة الجهاز
+  Future<void> _saveLoginMethod(String method) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('loginMethod', method);
+  }
+
+  // دالة ذكية لتوجيه المستخدم بناءً على اكتمال ملفه الشخصي
+  void _redirectUser(User user, String provider, String emailOrPhone) async {
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .get();
+
+    bool isComplete = false;
+    if (userDoc.exists) {
+      var data = userDoc.data() as Map<String, dynamic>;
+      isComplete = data['isProfileComplete'] ?? false;
+    }
+
+    if (mounted) {
+      if (isComplete) {
+        // إذا الحساب مكتمل يروح للهوم مباشرة
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+              (route) => false,
+        );
+      } else {
+        // إذا جديد أو غير مكتمل يروح لصفحة إكمال البيانات
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ProfilePage(
+              userEmail: emailOrPhone,
+              loginProvider: provider,
+              canEditPassword: false, // لا نسمح بتعديل الباسورد هنا (فقط من الاستعادة)
+            ),
+          ),
+              (route) => false,
+        );
+      }
+    }
   }
 
   void startTimer(StateSetter setSheetState) {
@@ -111,12 +156,11 @@ class _LoginPageState extends State<LoginPage> {
                         errorText: _phoneError,
                         errorStyle: const TextStyle(fontSize: 10, height: 0.8),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: const BorderSide(color: Colors.redAccent)),
                       ),
                       initialCountryCode: 'SA',
                       onChanged: (phone) {
                         _phoneNumber = phone.number;
-                        _fullPhoneNumber = phone.completeNumber; // يأخذ +966 تلقائياً
+                        _fullPhoneNumber = phone.completeNumber;
                         if(_phoneError != null) setSheetState(() => _phoneError = null);
                       },
                     ),
@@ -140,7 +184,6 @@ class _LoginPageState extends State<LoginPage> {
                         : CustomTextLink(
                       text: "إعادة إرسال الرمز؟",
                       onTap: () {
-                        // إعادة إرسال الرمز عبر فايربيس
                         _authService.verifyPhoneNumber(
                           phoneNumber: _fullPhoneNumber,
                           onCodeSent: (id) => setSheetState(() => _verificationId = id),
@@ -153,61 +196,43 @@ class _LoginPageState extends State<LoginPage> {
 
                   const SizedBox(height: 30),
 
-                  Opacity(
-                    opacity: (isCodeSent && !isOtpComplete) ? 0.5 : 1.0,
-                    child: WaterRippleButton(
-                      text: isCodeSent ? "تحقق ودخول" : "إرسال رمز التحقق",
-                      onTap: (isCodeSent && !isOtpComplete) ? () {} : () async {
-                        if (!isCodeSent) {
-                          if (_phoneNumber.trim().isEmpty) {
-                            setSheetState(() => _phoneError = "الرجاء إدخال رقم الجوال");
-                          } else if (_phoneNumber.length != 9) {
-                            setSheetState(() => _phoneError = "الرجاء التأكد من صحة رقم الجوال");
-                          } else {
-                            // الربط الحقيقي: إرسال الكود
-                            await _authService.verifyPhoneNumber(
-                                phoneNumber: _fullPhoneNumber,
-                                onCodeSent: (id) {
-                                  setSheetState(() {
-                                    _verificationId = id;
-                                    isCodeSent = true;
-                                    _phoneError = null;
-                                    startTimer(setSheetState);
-                                  });
-                                },
-                                onError: (error) {
-                                  setSheetState(() => _phoneError = error);
-                                }
-                            );
-                          }
+                  WaterRippleButton(
+                    text: isCodeSent ? "تحقق ودخول" : "إرسال رمز التحقق",
+                    onTap: (isCodeSent && !isOtpComplete) ? () {} : () async {
+                      if (!isCodeSent) {
+                        if (_phoneNumber.trim().isEmpty) {
+                          setSheetState(() => _phoneError = "الرجاء إدخال رقم الجوال");
                         } else {
-                          // الربط الحقيقي: التحقق من الكود
-                          String enteredCode = _otpCode.join("");
-                          try {
-                            final user = await _authService.signInWithOTP(_verificationId, enteredCode);
-                            if (user != null) {
-                              Navigator.pop(context);
-                              Navigator.pushAndRemoveUntil(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ProfilePage(
-                                    userEmail: _fullPhoneNumber,
-                                    loginProvider: "phone",
-                                  ),
-                                ),
-                                    (route) => false,
-                              );
-                            }
-                          } catch (e) {
-                            setSheetState(() => _isOtpError = true);
-                          }
+                          await _authService.verifyPhoneNumber(
+                              phoneNumber: _fullPhoneNumber,
+                              onCodeSent: (id) {
+                                setSheetState(() {
+                                  _verificationId = id;
+                                  isCodeSent = true;
+                                  _phoneError = null;
+                                  startTimer(setSheetState);
+                                });
+                              },
+                              onError: (error) => setSheetState(() => _phoneError = error)
+                          );
                         }
-                      },
-                      width: double.infinity,
-                      height: 55,
-                    ),
+                      } else {
+                        String enteredCode = _otpCode.join("");
+                        try {
+                          final user = await _authService.signInWithOTP(_verificationId, enteredCode);
+                          if (user != null) {
+                            await _saveLoginMethod("phone");
+                            if (mounted) Navigator.pop(context);
+                            _redirectUser(user, "phone", _fullPhoneNumber);
+                          }
+                        } catch (e) {
+                          setSheetState(() => _isOtpError = true);
+                        }
+                      }
+                    },
+                    width: double.infinity,
+                    height: 55,
                   ),
-                  const SizedBox(height: 10),
                 ],
               ),
             ),
@@ -230,31 +255,18 @@ class _LoginPageState extends State<LoginPage> {
           counterText: "",
           fillColor: const Color(0xFFFBF9FF),
           filled: true,
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFFEEEEEE), width: _isOtpError ? 2 : 1),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFF673AB7), width: 2),
-          ),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFFEEEEEE))),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFF673AB7), width: 2)),
         ),
         onChanged: (value) {
-          setSheetState(() {
-            _otpCode[index] = value;
-            _isOtpError = false;
-          });
-          if (value.length == 1 && index < 5) {
-            FocusScope.of(context).nextFocus();
-          } else if (value.isEmpty && index > 0) {
-            FocusScope.of(context).previousFocus();
-          }
+          setSheetState(() { _otpCode[index] = value; _isOtpError = false; });
+          if (value.length == 1 && index < 5) FocusScope.of(context).nextFocus();
+          if (value.isEmpty && index > 0) FocusScope.of(context).previousFocus();
         },
       ),
     );
   }
 
-  // --- دالة تسجيل الدخول بالإيميل (بقيت كما هي) ---
   void _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")));
@@ -263,51 +275,39 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
     try {
       final user = await _authService.login(_emailController.text.trim(), _passwordController.text.trim());
-
-      if (user != null && mounted) {
-        // فحص حالة إكمال البيانات في Firestore
-        DocumentSnapshot userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        bool isComplete = false;
-        if (userDoc.exists) {
-          // نتأكد من وجود الحقل، إذا لم يوجد نعتبره false
-          var data = userDoc.data() as Map<String, dynamic>;
-          isComplete = data['isProfileComplete'] ?? false;
-        }
-
-        if (isComplete) {
-          // مستخدم قديم -> للهوم مباشرة
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(builder: (context) => const HomePage()),
-                (route) => false,
-          );
-        } else {
-          // مستخدم جديد -> لصفحة الملف الشخصي لإكمال بياناته
-          Navigator.pushAndRemoveUntil(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ProfilePage(
-                userEmail: _emailController.text.trim(),
-                loginProvider: "email",
-              ),
-            ),
-                (route) => false,
-          );
-        }
+      if (user != null) {
+        await _saveLoginMethod("email");
+        _redirectUser(user, "email", _emailController.text.trim());
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(e.toString().replaceAll("Exception:", "")),
-            backgroundColor: Colors.redAccent));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: Colors.redAccent));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  void _showComingSoonDialog(BuildContext context, String provider) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.auto_awesome_rounded, color: Color(0xFFB293CD), size: 60),
+            const SizedBox(height: 20),
+            const Text("! قريبًا", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+            const SizedBox(height: 15),
+            Text("خدمة تسجيل الدخول بواسطة $provider قيد التطوير حالياً.", textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+            const SizedBox(height: 30),
+            WaterRippleButton(text: "حسناً", onTap: () => Navigator.pop(context), width: double.infinity, height: 50),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -321,33 +321,25 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(35),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFD2B4EC).withOpacity(0.15),
-                  blurRadius: 30,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+              boxShadow: [BoxShadow(color: const Color(0xFFD2B4EC).withOpacity(0.15), blurRadius: 30, offset: const Offset(0, 10))],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset('resourses/DallahAppLogo2.png', height: 80, fit: BoxFit.contain),
+                Image.asset('resourses/DallahAppLogo2.png', height: 80),
                 const SizedBox(height: 15),
                 const Text("تسجيل الدخول", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
-                const Text("! هلابك من جديد ", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
+                const Text("! هلابك من جديد ", style: TextStyle(fontSize: 14, color: Colors.grey)),
                 const SizedBox(height: 30),
 
-                CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك الإلكتروني", controller: _emailController, fillColor: const Color(0xFFFBF9FF), keyboardType: TextInputType.emailAddress),
+                CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك الإلكتروني", controller: _emailController, fillColor: const Color(0xFFFBF9FF)),
                 const SizedBox(height: 18),
                 CustomInputField(label: "كلمة السر", hintText: "أدخل كلمة السر", controller: _passwordController, isPass: true, fillColor: const Color(0xFFFBF9FF)),
 
                 const SizedBox(height: 30),
-
                 WaterRippleButton(text: "دخول", onTap: _handleLogin, isLoading: _isLoading, width: double.infinity, height: 55),
 
                 const SizedBox(height: 25),
-
                 const Row(children: [
                   Expanded(child: Divider(thickness: 1, color: Color(0xFFEEEEEE))),
                   Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text("أو سجل الدخول عبر", style: TextStyle(color: Colors.grey, fontSize: 12))),
@@ -355,42 +347,24 @@ class _LoginPageState extends State<LoginPage> {
                 ]),
 
                 const SizedBox(height: 20),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildSocialIcon(FontAwesomeIcons.apple, Colors.black, "أبل", () {}),
-                    _buildSocialIcon(FontAwesomeIcons.microsoft, const Color(0xFF00A4EF), "مايكروسوفت", () {}),
+                    _buildSocialIcon(FontAwesomeIcons.apple, Colors.black, "أبل", () => _showComingSoonDialog(context, "أبل")),
+                    _buildSocialIcon(FontAwesomeIcons.microsoft, const Color(0xFF00A4EF), "مايكروسوفت", () => _showComingSoonDialog(context, "مايكروسوفت")),
                     _buildSocialIcon(FontAwesomeIcons.google, const Color(0xFFDB4437), "قوقل", () async {
                       setState(() => _isLoading = true);
-
                       User? user = await _authService.signInWithGoogle();
-
                       setState(() => _isLoading = false);
-
-                      if (user != null && mounted) {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => ProfilePage(
-                              userEmail: user.email ?? "",
-                              loginProvider: "google",
-                            ),
-                          ),
-                              (route) => false,
-                        );
-                      } else if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text("فشل تسجيل الدخول عبر قوقل")),
-                        );
+                      if (user != null) {
+                        await _saveLoginMethod("google");
+                        _redirectUser(user, "google", user.email ?? "");
                       }
                     }),
                     _buildSocialIcon(Icons.phone_android, const Color(0xFF673AB7), "رقم الجوال", _showPhoneLoginSheet),
                   ],
                 ),
-
                 const SizedBox(height: 25),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -415,29 +389,12 @@ class _LoginPageState extends State<LoginPage> {
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFF0F0F0)),
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                    color: Colors.black.withOpacity(0.02),
-                    blurRadius: 5,
-                    spreadRadius: 1
-                )
-              ],
-            ),
-            // هنا يتم فحص نوع الأيقونة وعرضها بشكل صحيح
-            child: icon is IconData
-                ? Icon(icon, color: color, size: 22)
-                : FaIcon(icon, color: color, size: 22),
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFF0F0F0)), color: Colors.white),
+            child: icon is IconData ? Icon(icon, color: color, size: 22) : FaIcon(icon, color: color, size: 22),
           ),
         ),
         const SizedBox(height: 6),
-        Text(
-            label,
-            style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)
-        ),
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
       ],
     );
   }

@@ -2,6 +2,7 @@
 //Rand
 import 'package:dhallah_app/screens/account_info_page.dart';
 import 'package:dhallah_app/services/authentication_serv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
 import'../Widgets/custom_text_field.dart';
@@ -39,16 +40,44 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Future<void> _sendResetLink() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("يرجى إدخال البريد الإلكتروني")));
+      _showError("يرجى إدخال البريد الإلكتروني");
       return;
     }
-    setState(() => _isLoading = true);
-    // هنا نضع كود الفايربيس لاحقاً
-    await Future.delayed(const Duration(seconds: 2));
-    setState(() => _isLoading = false);
-    _showSuccessDialog("تم إرسال رابط استعادة كلمة المرور لبريدك.");
-  }
 
+    setState(() => _isLoading = true);
+
+    try {
+      // هذه هي الدالة الحقيقية التي ترسل الإيميل من فايربيس
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+
+      setState(() => _isLoading = false);
+      _showSuccessDialog("تم إرسال رابط استعادة كلمة المرور لبريدك. يرجى تفقد البريد الوارد (والرسائل غير المرغوب فيها).");
+    } on FirebaseAuthException catch (e) {
+      setState(() => _isLoading = false);
+      String errorMessage = "حدث خطأ أثناء الإرسال";
+
+      if (e.code == 'user-not-found') {
+        errorMessage = "هذا البريد غير مسجل لدينا.";
+      } else if (e.code == 'invalid-email') {
+        errorMessage = "صيغة البريد الإلكتروني غير صحيحة.";
+      }
+
+      _showError(errorMessage);
+    } catch (e) {
+      setState(() => _isLoading = false);
+      _showError("حدث خطأ غير متوقع: $e");
+    }
+  }
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message, textAlign: TextAlign.right),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
   void startTimer() {
     setState(() { _isTimerActive = true; _start = 180; });
     _timer?.cancel();
@@ -90,6 +119,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
 // داخل ForgotPasswordScreen
+// داخل ForgotPasswordScreen في ملف ForgotPassword_page.dart
+
   void _verifyOtpAndNavigate() async {
     String fullCode = _otpCode.join("");
 
@@ -101,25 +132,32 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // التحقق الفعلي مع فايربيس
+      // 1. التحقق الفعلي مع فايربيس
       final user = await _authService.signInWithOTP(_verificationId, fullCode);
 
       if (user != null && mounted) {
-        // الآن user يحمل بيانات المستخدم الفعلي، والفايربيس يعتبره مسجل دخول
+
+        // --- التعديل المهم هنا يا رند ---
+        // 2. حفظ طريقة الدخول في الشيرد بريفرنسز فوراً عند نجاح الكود
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('loginMethod', 'phone');
+        // ---------------------------------
+
+        // 3. الانتقال لصفحة البروفايل
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ProfilePage(
               userEmail: user.email ?? "",
               initialPhoneNumber: "+966$_phoneNumber",
-              loginProvider: "phone",
+              loginProvider: "phone", // نمررها يدوياً هنا أيضاً للتأكيد
               canEditPassword: true,
             ),
           ),
         );
       }
     } catch (e) {
-      setState(() => _isOtpError = true); // يظهر "الرمز خاطئ" فقط إذا رفضه فايربيس
+      setState(() => _isOtpError = true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
