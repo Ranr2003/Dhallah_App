@@ -105,20 +105,26 @@ class _ProfilePageState extends State<ProfilePage> {
         debugPrint("تم تحديث كلمة المرور في Auth بنجاح");
       }
 
-      // 2. تحديث البيانات في Firestore
+      // 2. تحديث البيانات في Firestore (بإضافة الحقول المطلوبة: uid و provider)
       await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
-        'name': _nameController.text.trim(),
-        'phone': _fullPhoneNumber.trim(),
-        'email': _emailController.text.trim(),
-        'isProfileComplete': true,
-        'lastUpdate': FieldValue.serverTimestamp(),
+        'email': _emailController.text.trim(),           // String
+        'isProfileComplete': true,                       // Boolean
+        'lastUpdate': FieldValue.serverTimestamp(),      // Timestamp
+        'name': _nameController.text.trim(),             // String
+        'phone': _fullPhoneNumber.trim(),                // String
+        'provider': widget.loginProvider,               // String (phone, google, email)
+        'uid': currentUser.uid,                          // String
       }, SetOptions(merge: true));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم تحديث البيانات وكلمة المرور بنجاح ✅"), backgroundColor: Colors.green),
+          const SnackBar(
+              content: Text("تم تحديث البيانات وكلمة المرور بنجاح ✅"),
+              backgroundColor: Colors.green
+          ),
         );
-        // ننتظر قليلاً ليقرأ الرسالة ثم نتوجه للهوم
+
+        // ننتظر قليلاً ليقرأ المستخدم الرسالة ثم نتوجه للهوم
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) {
             Navigator.pushAndRemoveUntil(
