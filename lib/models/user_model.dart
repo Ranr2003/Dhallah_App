@@ -6,14 +6,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 */
 
 abstract class User {
-  String uid;             // تم التغيير من int إلى String
+  String userId;             // تم التغيير من int إلى String
   String name;            // تم التغيير من username إلى name
   String email;
   String? phone;          // نجعله nullable لأن البداية قد تكون null
   DateTime? lastUpdate;   // ليطابق التايم ستامب في الداتابيز
 
   User({
-    required this.uid,
+    required this.userId,
     required this.name,
     required this.email,
     this.phone,
@@ -29,7 +29,7 @@ class RegularUser extends User {
   String? provider;
 
   RegularUser({
-    required super.uid,
+    required super.userId,
     required super.name,
     required super.email,
     super.phone,
@@ -42,7 +42,7 @@ class RegularUser extends User {
   // --- دالة سحرية: تحول بيانات Firestore (Map) إلى كائن برمجى (Object) ---
   factory RegularUser.fromMap(Map<String, dynamic> data) {
     return RegularUser(
-      uid: data['uid'] ?? '',
+      userId: data['userId'] ?? '',
       name: data['name'] ?? '',
       email: data['email'] ?? '',
       phone: data['phone'],
@@ -56,7 +56,7 @@ class RegularUser extends User {
   // --- دالة سحرية: تحول الكائن إلى (Map) لإرساله إلى Firestore ---
   Map<String, dynamic> toMap() {
     return {
-      'uid': uid,
+      'userId': userId,
       'name': name,
       'email': email,
       'phone': phone,
@@ -79,7 +79,7 @@ class Admin extends User {
   String adminLevel;
 
   Admin({
-    required super.uid,
+    required super.userId,
     required super.name,
     required super.email,
     super.phone,
@@ -89,7 +89,7 @@ class Admin extends User {
 
   factory Admin.fromMap(Map<String, dynamic> data) {
     return Admin(
-      uid: data['uid'] ?? '',
+      userId: data['userId'] ?? '',
       name: data['name'] ?? '',
       email: data['email'] ?? '',
       phone: data['phone'],

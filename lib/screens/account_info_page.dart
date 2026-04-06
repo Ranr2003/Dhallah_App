@@ -113,7 +113,7 @@ class _ProfilePageState extends State<ProfilePage> {
         'name': _nameController.text.trim(),             // String
         'phone': _fullPhoneNumber.trim(),                // String
         'provider': widget.loginProvider,               // String (phone, google, email)
-        'uid': currentUser.uid,                          // String
+        'userId': currentUser.uid,                          // String
       }, SetOptions(merge: true));
 
       if (mounted) {
