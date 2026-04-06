@@ -202,57 +202,98 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // --- نافذة إدخال كود الـ OTP ---
+  // --- نافذة إدخال كود الـ OTP (تحديث الشكل فقط) ---
   void _showOtpDialog() {
+    // نحتفظ بنفس المنطق الأصلي: قائمة من الـ Controllers
     final List<TextEditingController> otpControllers = List.generate(6, (index) => TextEditingController());
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+      backgroundColor: Colors.transparent, // لجعل الحواف العلوية تظهر بشكل دائري خلفية بيضاء
       builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 20, right: 20, top: 30),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text("تحقق من الرقم لربط الحساب", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Text("أدخل الرمز المرسل إلى $_fullPhoneNumber", style: const TextStyle(color: Colors.grey)),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(6, (index) => SizedBox(
-                width: 40,
-                child: TextField(
-                  controller: otpControllers[index],
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  maxLength: 1,
-                  decoration: const InputDecoration(counterText: ""),
-                  onChanged: (value) {
-                    if (value.length == 1 && index < 5) FocusScope.of(context).nextFocus();
-                  },
-                ),
-              )),
-            ),
-            const SizedBox(height: 30),
-            WaterRippleButton(
-              text: "تأكيد وربط الحساب",
-              onTap: () async {
-                String smsCode = otpControllers.map((e) => e.text).join();
-                try {
-                  await _authService.linkPhoneNumber(_verificationId, smsCode);
-                  Navigator.pop(context); // إغلاق الشيت
-                  await _finalSave(); // الحفظ النهائي في Firestore
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("كود التحقق غير صحيح")));
-                }
-              },
-              width: double.infinity,
-              height: 50,
-            ),
-            const SizedBox(height: 20),
-          ],
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+        child: Container(
+          // استخدام نفس الـ Decoration الموحد للنافذة
+          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // خط السحب العلوي للجمالية
+              Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+              const SizedBox(height: 25),
+
+              const Text("تحقق من الرقم لربط الحساب",
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+              const SizedBox(height: 10),
+              Text("أدخل الرمز المرسل إلى $_fullPhoneNumber",
+                  style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
+              const SizedBox(height: 30),
+
+              // صف مربعات الـ OTP الموحدة شكلياً
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: List.generate(6, (index) => SizedBox(
+                  width: 45,
+                  child: TextField(
+                    // نحتفظ بالـ Controller الأصلي
+                    controller: otpControllers[index],
+                    autofocus: index == 0,
+                    textAlign: TextAlign.center,
+                    keyboardType: TextInputType.number,
+                    maxLength: 1,
+                    // استخدام نفس الـ Style الموحد للنص
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF673AB7)),
+                    // تطبيق نفس الـ Decoration الموحد للمربعات (بدون منطق تغيير اللون للخطأ)
+                    decoration: InputDecoration(
+                      counterText: "",
+                      fillColor: const Color(0xFFFBF9FF),
+                      filled: true,
+                      enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFFEEEEEE))
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: Color(0xFF673AB7), width: 2)
+                      ),
+                    ),
+                    onChanged: (value) {
+                      // التنقل التلقائي للأمام عند الكتابة
+                      if (value.length == 1 && index < 5) FocusScope.of(context).nextFocus();
+                      // التنقل التلقائي للخلف عند الحذف
+                      if (value.isEmpty && index > 0) FocusScope.of(context).previousFocus();
+                    },
+                  ),
+                )),
+              ),
+
+              const SizedBox(height: 35),
+
+              WaterRippleButton(
+                text: "تأكيد وربط الحساب",
+                // نحتفظ بنفس منطق الحفظ الأصلي
+                onTap: () async {
+                  String smsCode = otpControllers.map((e) => e.text).join();
+                  try {
+                    await _authService.linkPhoneNumber(_verificationId, smsCode);
+                    if (mounted) Navigator.pop(context); // إغلاق الشيت
+                    await _finalSave(); // الحفظ النهائي في Firestore
+                  } catch (e) {
+                    // نحتفظ بنفس منطق إظهار الخطأ الأصلي عبر SnackBar
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("كود التحقق غير صحيح")));
+                  }
+                },
+                width: double.infinity,
+                height: 55,
+              ),
+              const SizedBox(height: 15),
+            ],
+          ),
         ),
       ),
     );

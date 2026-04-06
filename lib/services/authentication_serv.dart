@@ -11,13 +11,34 @@ class AuthenticationService {
 
   // --- حفظ/تحديث المستخدم في Firestore ---
   // نستخدم merge: true لضمان عدم مسح البيانات القديمة
-  Future<void> _saveUserData(User user) async {
-    await _firestore.collection('users').doc(user.uid).set({
-      'name': user.displayName ?? "مستخدم",
+  Future<void> _saveUserData(User user, {String? providedName}) async {
+    // 1. جلب بيانات المستخدم الحالية من الفايرستور
+    DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+
+    Map<String, dynamic> dataToSave = {
       'email': user.email,
-      'phone': user.phoneNumber, // سيتم تخزينه هنا تلقائياً بعد نجاح الربط
+      'phone': user.phoneNumber,
       'lastUpdate': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    };
+
+    // 2. التحقق: هل المستخدم لديه اسم مخزن مسبقاً؟
+    if (userDoc.exists && userDoc.data() != null) {
+      Map<String, dynamic> existingData = userDoc.data() as Map<String, dynamic>;
+      if (existingData.containsKey('name') && existingData['name'] != null && existingData['name'].toString().isNotEmpty) {
+        // إذا الاسم موجود، لا نغيره ببيانات تسجيل الدخول الجديدة (مثل اسم قوقل)
+        // نتركه كما هو في الفايرستور
+      } else {
+        // إذا الحساب موجود بس لسبب ما الاسم فارغ، نضع اسم افتراضي
+        dataToSave['name'] = user.displayName ?? "مستخدم ضالة";
+      }
+    } else {
+      // 3. إذا كان مستخدم جديد كلياً (أول مرة يسجل)
+      dataToSave['name'] = providedName ?? user.displayName ?? "مستخدم جديد";
+      dataToSave['isProfileComplete'] = false;
+    }
+
+    // الحفظ مع خاصية merge لضمان عدم مسح أي حقول أخرى (مثل الصور أو التقييمات)
+    await _firestore.collection('users').doc(user.uid).set(dataToSave, SetOptions(merge: true));
   }
 
   // --- 1. تسجيل الدخول بجوجل (مع الربط التلقائي) ---
@@ -77,7 +98,20 @@ class AuthenticationService {
       await _saveUserData(user!);
       return user;
     } on FirebaseAuthException catch (e) {
-      throw Exception(e.message);
+      // هنا نوحد جميع رسائل خطأ تسجيل الدخول في رسالة واحدة مفهومة
+      // الأكواد الشائعة: user-not-found, wrong-password, invalid-credential
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'invalid-email') {
+        throw "البريد الإلكتروني أو كلمة السر غير صحيحة.";
+      } else if (e.code == 'too-many-requests') {
+        throw "تمت محاولة الدخول بشكل خاطئ كثيراً، جرب لاحقاً.";
+      } else {
+        throw "حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة ثانية.";
+      }
+    } catch (e) {
+      throw "عذراً، حدث خطأ غير متوقع.";
     }
   }
 
@@ -89,20 +123,37 @@ class AuthenticationService {
     required String confirmPassword,
   }) async {
     try {
-      if (password != confirmPassword) throw Exception("كلمتا المرور غير متطابقتين!");
-      if (!validatePassword(password)) throw Exception("كلمة المرور يجب أن تكون 6 خانات على الأقل");
+      if (password != confirmPassword) throw Exception(
+          "كلمتا المرور غير متطابقتين!");
+      if (!validatePassword(password)) throw Exception(
+          "كلمة المرور يجب أن تكون 6 خانات على الأقل");
 
-      final result = await _auth.createUserWithEmailAndPassword(email: email, password: password);
+      final result = await _auth.createUserWithEmailAndPassword(
+          email: email, password: password);
       User? user = result.user;
 
       if (user != null) {
         await user.updateDisplayName(username);
-        await _saveUserData(user);
+        await _saveUserData(user, providedName: username);
         await user.sendEmailVerification();
       }
       return user;
+    } on FirebaseAuthException catch (e) {
+      // هنا نحول أكواد الفايربيس إلى رسائل عربية
+      switch (e.code) {
+        case 'email-already-in-use':
+          throw "هذا البريد الإلكتروني مسجل مسبقاً، جرب تسجيل الدخول.";
+        case 'invalid-email':
+          throw "صيغة البريد الإلكتروني غير صحيحة.";
+        case 'operation-not-allowed':
+          throw "عملية التسجيل معطلة حالياً، تواصل مع الدعم.";
+        case 'weak-password':
+          throw "كلمة المرور التي اخترتها ضعيفة جداً.";
+        default:
+          throw "حدث خطأ غير متوقع، يرجى المحاولة لاحقاً.";
+      }
     } catch (e) {
-      rethrow;
+      throw e.toString();
     }
   }
 
