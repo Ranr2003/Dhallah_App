@@ -79,13 +79,11 @@ class ChatListPage extends StatelessWidget {
                           message: lastMsg,
                           count: countString,
                           onTap: () async {
-                            // 1. تصفير العداد تلقائياً عند دخول المحادثة
                             await FirebaseFirestore.instance
                                 .collection('chat_rooms')
                                 .doc(chatRoomId)
                                 .update({'unreadCount': 0});
 
-                            // 2. الانتقال لصفحة المحادثة
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -103,9 +101,40 @@ class ChatListPage extends StatelessWidget {
                   },
                 ),
               ),
+              const CustomBottomBar(),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+class CustomBottomBar extends StatelessWidget {
+  const CustomBottomBar({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20, top: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          const Icon(Icons.person_outline, color: AppColors.textHint),
+          const Icon(Icons.home_outlined, color: AppColors.textHint),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.fieldBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
+          ),
+        ],
       ),
     );
   }

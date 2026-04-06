@@ -1,18 +1,21 @@
-// 1. السطر الصحيح لاستدعاء مكتبة الفايربيس
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChatService {
-  // الآن سيعرف التطبيق معنى FirebaseFirestore
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  // جلب الـ ID الخاص بالمستخدم المسجل حالياً
+  String? get currentUserId => _auth.currentUser?.uid;
 
   Future<void> sendMessage(String receiverId, String receiverName, String message) async {
-    final String currentUserId = "02";
+    // التأكد أن المستخدم مسجل دخول
+    if (currentUserId == null) return;
 
-    List<String> ids = [currentUserId, receiverId];
+    // بناء معرف الغرفة (دائماً مرتب أبجدياً لضمان عدم التكرار)
+    List<String> ids = [currentUserId!, receiverId];
     ids.sort();
     String chatRoomId = ids.join("_");
 
-    // إضافة الرسالة
     await _firestore
         .collection('chat_rooms')
         .doc(chatRoomId)
@@ -26,22 +29,22 @@ class ChatService {
 
     await _firestore.collection('chat_rooms').doc(chatRoomId).set({
       'lastMessage': message,
+      'lastSenderId': currentUserId,
       'receiverId': receiverId,
       'receiverName': receiverName,
-      'lastSenderId': currentUserId,
       'timestamp': FieldValue.serverTimestamp(),
       'unreadCount': FieldValue.increment(1),
     }, SetOptions(merge: true));
-
   }
 
-  // دالة جلب الرسائل
-  Stream<QuerySnapshot> getMessages(String chatRoomId) {
-    return _firestore
-        .collection('chat_rooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .orderBy('timestamp', descending: false)
-        .snapshots();
+  // دالة لتصفير العداد عند قراءة الرسائل
+  Future<void> markAsRead(String chatRoomId) async {
+    try {
+      await _firestore.collection('chat_rooms').doc(chatRoomId).update({
+        'unreadCount': 0,
+      });
+    } catch (e) {
+      print("خطأ أثناء تحديث حالة القراءة: $e");
+    }
   }
 }
