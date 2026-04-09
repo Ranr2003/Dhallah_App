@@ -1,85 +1,101 @@
 //database_serv.dart
 //Rand
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
+import '../models/user_model.dart';
 
 class DatabaseService {
-  // المرجع الأساسي لقاعدة البيانات (بديل للـ ConnectionString)
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // 1. إضافة سجل (Insert)
-  Future<bool> insertRecord(String collection, Map<String, dynamic> data) async {
+  // هذه الدالة ستكون البديل لـ _saveUserData التي كانت في ملف المصادقة
+  Future<void> updateOrCreateUser(RegularUser user) async {
     try {
-      await _db.collection(collection).add(data);
-      return true;
+      final docRef = _db.collection('users').doc(user.userId);
+      final docSnap = await docRef.get();
+
+      if (docSnap.exists) {
+        // إذا المستخدم موجود، نحدث البيانات مع الحفاظ على الاسم القديم إذا كان موجوداً
+        Map<String, dynamic> existingData = docSnap.data() as Map<String, dynamic>;
+        Map<String, dynamic> newData = user.toMap();
+
+        if (existingData['name'] != null && existingData['name'].toString().isNotEmpty) {
+          newData.remove('name'); // نحذف الاسم من البيانات الجديدة لكي لا يمسح القديم في الـ merge
+        }
+        // 2. الحماية الجديدة: لا تسمح للدخول الجديد بمسح حالة "اكتمال الملف"
+        // إذا كانت القيمة في قاعدة البيانات true، احذفها من الماب الجديد لكي لا نغيرها لـ false
+        if (existingData['isProfileComplete'] == true) {
+          newData.remove('isProfileComplete');
+        }
+
+        await docRef.set(newData, SetOptions(merge: true));
+      } else {
+        // إذا مستخدم جديد كلياً
+        await docRef.set(user.toMap(), SetOptions(merge: true));
+      }
     } catch (e) {
-      print("Error inserting record: $e");
-      return false;
+      throw "خطأ في حفظ بيانات المستخدم في القاعدة: $e";
     }
   }
 
-  // 2. تحديث سجل (Update)
-  Future<bool> updateRecord(String collection, String id, Map<String, dynamic> data) async {
+  /// دالة مهمتها فقط إخبارنا: هل هذا المستخدم أكمل ملفه أم لا؟
+  Future<bool> checkProfileCompletion(String uid) async {
     try {
-      await _db.collection(collection).doc(id).update(data);
-      return true;
+      DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        final userData = RegularUser.fromMap(doc.data() as Map<String, dynamic>);
+        return userData.isProfileComplete;
+      }
+      return false; // إذا لم يجد السجل نعتبره غير مكتمل
     } catch (e) {
-      return false;
+      return false; // في حال حدوث خطأ، نوجهه لإكمال البيانات للأمان
+    }
+  }
+// 1. خوارزمية الجلب (نفس كودك بالضبط)
+  Future<void> loadUserData({
+    required TextEditingController nameController,
+    required TextEditingController phoneController,
+    required TextEditingController emailController,
+    required bool mounted,
+    required Function(bool) setLoading,
+    required Function(String) setFullPhone,
+    required Function(VoidCallback) updateState,
+  }) async {
+    try {
+      fb.User? user = fb.FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        DocumentSnapshot doc = await _db.collection('users').doc(user.uid).get();
+        if (doc.exists && mounted) {
+          final userData = RegularUser.fromMap(doc.data() as Map<String, dynamic>);
+          updateState(() {
+            if (nameController.text.isEmpty) nameController.text = userData.name;
+            if (userData.phone != null) {
+              phoneController.text = userData.phone!.replaceFirst('+966', '');
+              setFullPhone(userData.phone!);
+            }
+            if (userData.email.isNotEmpty) emailController.text = userData.email;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint("خطأ في جلب البيانات: $e");
+    } finally {
+      setLoading(false);
     }
   }
 
-  // 3. حذف سجل (Delete)
-  Future<bool> deleteRecord(String collection, String id) async {
-    try {
-      await _db.collection(collection).doc(id).delete();
-      return true;
-    } catch (e) {
-      return false;
-    }
+  Future<void> saveProfile(RegularUser user) async {
+    await _db.collection('users').doc(user.userId).set(
+      user.toMap(),
+      SetOptions(merge: true),
+    );
   }
 
-// 4. البحث عن مستخدم بواسطة الإيميل
-  Future<Map<String, dynamic>?> findUserByEmail(String email) async {
-    // بدلاً من '==' نستخدم المعامل المدمج isEqualTo
-    final query = await _db
-        .collection('users')
-        .where('email', isEqualTo: email)
-        .get();
-
-    return query.docs.isNotEmpty ? query.docs.first.data() : null;
-  }
-
-// 5. هل الإيميل مسجل مسبقاً؟
-  Future<bool> isEmailRegistered(String email) async {
-    final query = await _db
-        .collection('users')
-        .where('email', isEqualTo: email)
-        .get();
-
-    return query.docs.isNotEmpty;
-  }
-
-  // 6. حفظ بيانات المستخدم (بعد التسجيل)
-  Future<bool> saveUserRecord(String uid, Map<String, dynamic> userData) async {
-    try {
-      await _db.collection('users').doc(uid).set(userData);
-      return true;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // 7. حفظ الأغراض المفقودة والموجودة
-  Future<bool> saveLostItem(Map<String, dynamic> data) async => await insertRecord('lostItems', data);
-  Future<bool> saveFoundItem(Map<String, dynamic> data) async => await insertRecord('foundItems', data);
-
-  // 8. جلب قوائم الأغراض
-  Future<List<Map<String, dynamic>>> findPotentialLostItems() async {
-    final snapshot = await _db.collection('lostItems').get();
-    return snapshot.docs.map((doc) => doc.data()).toList();
-  }
-
-  Future<List<Map<String, dynamic>>> findPotentialFoundItems() async {
-    final snapshot = await _db.collection('foundItems').get();
-    return snapshot.docs.map((doc) => doc.data()).toList();
+  // 2. خوارزمية الفحص (هل القيمة مستخدمة من شخص آخر؟)
+  Future<bool> isFieldTaken(String field, String value, String currentUid) async {
+    final query = await _db.collection('users').where(field, isEqualTo: value).get();
+    // نرجع true فقط إذا وجدنا شخصاً آخر (UID مختلف) يستخدم نفس القيمة
+    return query.docs.any((doc) => doc.id != currentUid);
   }
 }

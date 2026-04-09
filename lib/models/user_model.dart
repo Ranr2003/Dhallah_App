@@ -1,16 +1,19 @@
 // user_model.dart
+//Rand
+// ---------------------------------------------------------
+//  (اولا) استيراد الباكجيز
+// ---------------------------------------------------------
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-/* هذا الموديل محدث ليتوافق تماماً مع حقول Firestore:
-  (email, name, phone, uid, provider, isProfileComplete, lastUpdate)
-*/
+// ---------------------------------------------------------
+//  (ثانيا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 
 abstract class User {
-  String userId;             // تم التغيير من int إلى String
-  String name;            // تم التغيير من username إلى name
+  String userId;
+  String name;
   String email;
-  String? phone;          // نجعله nullable لأن البداية قد تكون null
-  DateTime? lastUpdate;   // ليطابق التايم ستامب في الداتابيز
+  String? phone;
+  DateTime? lastUpdate;
 
   User({
     required this.userId,
@@ -21,8 +24,8 @@ abstract class User {
   });
 }
 
-//############################################
-// --- Regular User Model ---
+
+// المستخدم العادي يرث من المستخدم وزدنا عليه كذا متغير
 class RegularUser extends User {
   String userType;
   bool isProfileComplete;
@@ -39,21 +42,21 @@ class RegularUser extends User {
     this.provider,
   });
 
-  // --- دالة سحرية: تحول بيانات Firestore (Map) إلى كائن برمجى (Object) ---
+  //لما ناخذ البيانات من الفاير ستور تجينا بشكل ماب فحنا بنحولها لاوبجكت عشان نقدر نستخدمه
   factory RegularUser.fromMap(Map<String, dynamic> data) {
     return RegularUser(
       userId: data['userId'] ?? '',
       name: data['name'] ?? '',
       email: data['email'] ?? '',
       phone: data['phone'],
-      isProfileComplete: data['isProfileComplete'] ?? false,
+        isProfileComplete: data['isProfileComplete'] ?? false ,
       provider: data['provider'],
       lastUpdate: (data['lastUpdate'] as Timestamp?)?.toDate(),
       userType: data['userType'] ?? 'regular',
     );
   }
 
-  // --- دالة سحرية: تحول الكائن إلى (Map) لإرساله إلى Firestore ---
+  //لما بنرجع نحفظ البيانات لفاير ستور محتاجين نحولها من اوبجكت لماب
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,
@@ -67,14 +70,13 @@ class RegularUser extends User {
     };
   }
 
-  // الدوال المنطقية الخاصة بكِ (مثل إنشاء بلاغ) تبقى كما هي هنا
+  // احس ماله فايده هنا
   void createLostReport(Object itemData) {
     // كود إرسال البلاغ...
   }
 }
 
-//############################################
-// --- Admin Model ---
+// الادمن يرث من المستخدم واضفنا له صفحه زيادة
 class Admin extends User {
   String adminLevel;
 

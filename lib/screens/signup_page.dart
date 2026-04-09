@@ -1,13 +1,23 @@
 // signup_page.dart
 // Rand
-import 'package:dhallah_app/services/authentication_serv.dart';
+
+// ---------------------------------------------------------
+// (أولا) استيراد المكتبات والباكجيز
+// ---------------------------------------------------------
 import 'package:flutter/material.dart';
+// ---------------------------------------------------------
+// (ثانيا) استيراد الصفحات الأخرى لإستخدامها
+// ---------------------------------------------------------
+import '../services/authentication_serv.dart';
+import '../screens/login_page.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
 import '../Widgets/custom_text_field.dart';
 import '../widgets/custom_text_link.dart';
-import '../screens/login_page.dart';
 
+// ---------------------------------------------------------
+//  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -24,7 +34,9 @@ class _SignUpPageState extends State<SignUpPage> {
   final AuthenticationService _authService = AuthenticationService();
 
   bool _isLoading = false;
-
+// ---------------------------------------------------------
+//  (رابعا) بعض الدوال المهمه مثل تنظيف و
+// ---------------------------------------------------------
   @override
   void dispose() {
     _usernameController.dispose();
@@ -45,9 +57,7 @@ class _SignUpPageState extends State<SignUpPage> {
       );
       return;
     }
-
     setState(() { _isLoading = true; });
-
     try {
       final user = await _authService.register(
         username: _usernameController.text.trim(),
@@ -55,9 +65,8 @@ class _SignUpPageState extends State<SignUpPage> {
         password: _passwordController.text.trim(),
         confirmPassword: _confirmPasswordController.text.trim(),
       );
-
+      // اذا نجح التسجيل نوجهه لصفحه الدخول ونقول له برساله النجاح يفعل الايميل
       if (user != null && mounted) {
-        // إظهار رسالة نجاح وتوجيه لتفعيل الإيميل
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("تم إنشاء الحساب! تفقد بريدك الإلكتروني لتفعيل الحساب."),
@@ -65,8 +74,6 @@ class _SignUpPageState extends State<SignUpPage> {
             duration: Duration(seconds: 4),
           ),
         );
-
-        // التوجيه لصفحة تسجيل الدخول بدلاً من البروفايل
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const LoginPage()),
@@ -88,7 +95,9 @@ class _SignUpPageState extends State<SignUpPage> {
       }
     }
   }
-
+// ---------------------------------------------------------
+//  (خامسا) البناء للصفحه
+// ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     return LoginSignupBackground(

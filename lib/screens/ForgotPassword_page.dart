@@ -1,18 +1,28 @@
 //ForgotPassword_page.dart
 //Rand
-import 'package:dhallah_app/screens/account_info_page.dart';
-import 'package:dhallah_app/services/authentication_serv.dart';
+
+// ---------------------------------------------------------
+// (أولا) استيراد المكتبات والباكجيز
+// ---------------------------------------------------------
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:intl_phone_field/intl_phone_field.dart';
+// ---------------------------------------------------------
+// (ثانيا) استيراد الصفحات الأخرى لإستخدامها
+// ---------------------------------------------------------
+import '../screens/account_info_page.dart';
+import '../services/authentication_serv.dart';
+import '../services/database_serv.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
 import'../Widgets/custom_text_field.dart';
 import'../widgets/custom_text_link.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'dart:async';
-import 'package:flutter/material.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
-// استورد ملفات الـ Widgets والـ Pages الخاصة بكِ هنا
+
+// ---------------------------------------------------------
+//  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -23,8 +33,9 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _emailController = TextEditingController();
   bool _isLoading = false;
-  bool _usePhone = true; // نخليه افتراضي على الجوال مثل صورتك
+  bool _usePhone = true;
   final AuthenticationService _authService = AuthenticationService();
+  final DatabaseService _dbService = DatabaseService();
   String _verificationId = "";
 
   String _phoneNumber = "";
@@ -36,38 +47,36 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   int _start = 180;
   bool _isTimerActive = false;
 
-  // --- الدالة التي كانت مفقودة وسببت الخطأ الثاني ---
+// ---------------------------------------------------------
+//  (رابعا) بعض الدوال المهمه مثل تنظيف و الؤقت و ارسال رابط الاستعاده والكود والانتقال  ورسائل  الخطأ
+// ---------------------------------------------------------
   Future<void> _sendResetLink() async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       _showError("يرجى إدخال البريد الإلكتروني");
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
-      // هذه هي الدالة الحقيقية التي ترسل الإيميل من فايربيس
       await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
-
       setState(() => _isLoading = false);
       _showSuccessDialog("تم إرسال رابط استعادة كلمة المرور لبريدك. يرجى تفقد البريد الوارد (والرسائل غير المرغوب فيها).");
     } on FirebaseAuthException catch (e) {
       setState(() => _isLoading = false);
-      String errorMessage = "حدث خطأ أثناء الإرسال";
-
       if (e.code == 'user-not-found') {
-        errorMessage = "هذا البريد غير مسجل لدينا.";
+        _showError("هذا البريد غير مسجل لدينا.");
       } else if (e.code == 'invalid-email') {
-        errorMessage = "صيغة البريد الإلكتروني غير صحيحة.";
+        _showError("صيغة البريد الإلكتروني غير صحيحة.");
+      } else {
+        _showError("حدث خطأ أثناء الإرسال: ${e.message}");
       }
 
-      _showError(errorMessage);
-    } catch (e) {
+    }catch (e) {
       setState(() => _isLoading = false);
       _showError("حدث خطأ غير متوقع: $e");
     }
   }
+
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -95,15 +104,21 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       setState(() => _phoneError = "الرجاء التأكد من صحة رقم الجوال");
       return;
     }
-
     setState(() => _isLoading = true);
+    bool isRegistered = await _dbService.isFieldTaken('phone', "+966$_phoneNumber", "no-uid");
 
-    // نستخدم الخدمة الحقيقية لإرسال الكود
+    if (!isRegistered) {
+      setState(() {
+        _isLoading = false;
+        _phoneError = "هذا الرقم غير مسجل لدينا، يرجى إنشاء حساب أولاً.";
+      });
+      return;
+    }
     await _authService.verifyPhoneNumber(
       phoneNumber: "+966$_phoneNumber",
       onCodeSent: (id) {
         setState(() {
-          _verificationId = id; // تخزين الـ ID الحقيقي من فايربيس
+          _verificationId = id;
           _isOtpSent = true;
           _isLoading = false;
           startTimer();
@@ -118,39 +133,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-// داخل ForgotPasswordScreen
-// داخل ForgotPasswordScreen في ملف ForgotPassword_page.dart
-
   void _verifyOtpAndNavigate() async {
+    // ندخل برقم الجوال فلازم نتحقق اول عشان يتيح لنا الانتقال لصفحه الملف لتعديل كلمه السر
     String fullCode = _otpCode.join("");
-
     if (fullCode.length != 6) {
       setState(() => _isOtpError = true);
       return;
     }
-
     setState(() => _isLoading = true);
-
     try {
-      // 1. التحقق الفعلي مع فايربيس
       final user = await _authService.signInWithOTP(_verificationId, fullCode);
-
       if (user != null && mounted) {
-
-        // --- التعديل المهم هنا يا رند ---
-        // 2. حفظ طريقة الدخول في الشيرد بريفرنسز فوراً عند نجاح الكود
-        final prefs = await SharedPreferences.getInstance();
+        final prefs = await SharedPreferences.getInstance(); // حفظنا طريقه الدخول
         await prefs.setString('loginMethod', 'phone');
-        // ---------------------------------
-
-        // 3. الانتقال لصفحة البروفايل
+        // الانتقال للملف الشخصي
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
             builder: (context) => ProfilePage(
               userEmail: user.email ?? "",
               initialPhoneNumber: "+966$_phoneNumber",
-              loginProvider: "phone", // نمررها يدوياً هنا أيضاً للتأكيد
+              loginProvider: "phone",
               canEditPassword: true,
             ),
           ),
@@ -178,24 +181,26 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
+// ---------------------------------------------------------
+//  (خامسا) البناء للصفحه و استقبال الكود
+// ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     bool isOtpComplete = _otpCode.every((digit) => digit.isNotEmpty);
 
     return LoginSignupBackground(
-      // 1. استخدام LayoutBuilder لمعرفة حجم الشاشة المتاح
+      // استخدمته لان قبل كان يضغط الخلفيه على حجم المكونات بس
       child: LayoutBuilder(
         builder: (context, constraints) {
           return SingleChildScrollView(
-            // 2. جعل الصفحة قابلة للسحب دائماً لضمان مرونة التصميم
+            // شيئ زياده عشان نضمن لما نفتح الكيبورد المكونات نقدر نسحبها اعلى او اسفل ونشوفها
             physics: const AlwaysScrollableScrollPhysics(),
             child: ConstrainedBox(
-              // 3. إجبار المحتوى على أخذ طول الشاشة كاملاً على الأقل
+              // هنا حليت مشكله الشاشه وأجبرته يأخذ حجم الشاشه
               constraints: BoxConstraints(minHeight: constraints.maxHeight),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 25.0),
                 child: Column(
-                  // 4. توسيط المحتوى عمودياً
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const SizedBox(height: 40), // مساحة علوية بسيطة
@@ -210,19 +215,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         style: TextStyle(fontSize: 13, color: Colors.grey)
                     ),
                     const SizedBox(height: 30),
-
+                    //هنا بنيت الزرين
                     if (!_isOtpSent)
                       Row(children: [
                         _buildTabButton("البريد الإلكتروني", !_usePhone, () => setState(() => _usePhone = false)),
                         const SizedBox(width: 10),
                         _buildTabButton("رقم الجوال", _usePhone, () => setState(() => _usePhone = true)),
                       ]),
-
                     const SizedBox(height: 30),
 
                     if (!_usePhone) ...[
                       CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك المسجل", controller: _emailController),
-                    ] else if (!_isOtpSent) ...[
+                    ] else if (!_isOtpSent) ...[// رمز التحقق توه لم يرسل
                       Directionality(
                         textDirection: TextDirection.ltr,
                         child: IntlPhoneField(
@@ -238,7 +242,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           ),
                         ),
                       ),
-                    ] else ...[
+                    ] else ...[//رمز التحقق ارسل
                       const Text("أدخل رمز التحقق", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 20),
                       Row(

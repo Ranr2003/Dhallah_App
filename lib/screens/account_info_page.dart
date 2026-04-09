@@ -1,23 +1,34 @@
 // account_info_page.dart
-// تم التحديث بواسطة رند بدعم Gemini (منطق الربط الذكي وتوحيد الـ UID)
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
-import 'package:intl_phone_field/intl_phone_field.dart';
-import '../widgets/login_signup_background.dart';
-import '../widgets/custom_button1.dart';
+// Rand
+
+// ---------------------------------------------------------
+// (أولا) استيراد المكتبات والباكجيز
+// ---------------------------------------------------------
+import 'package:firebase_auth/firebase_auth.dart' as fb;      // للمصادقة
+import 'package:flutter/material.dart';                 // لواجهات فلاتر
+import 'package:intl_phone_field/intl_phone_field.dart';// لحقل الهاتف الدولي العلم والمفتاح
+// ---------------------------------------------------------
+// (ثانيا) استيراد الصفحات الأخرى لإستخدامها
+// ---------------------------------------------------------
+import '../models/user_model.dart';
+import '../widgets/login_signup_background.dart';       // للخلفية
+import '../widgets/custom_button1.dart';                //
 import '../widgets/custom_text_field.dart';
-import '../services/authentication_serv.dart'; // تأكدي من استيراد ملف الخدمة
+import '../services/authentication_serv.dart';// تأكدي من استيراد ملف الخدمة
+import '../services/database_serv.dart';
 import 'login_page.dart';
 import 'home_page.dart';
 
+// ---------------------------------------------------------
+//  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class ProfilePage extends StatefulWidget {
   final String userEmail;
   final String? initialPhoneNumber;
   final String? initialName;
   final String loginProvider;
-  final bool canEditPassword;
-
+  final bool canEditPassword; // لتحديد ما اذا كان مسموحا بتعديل كلمه المرور أم لا
+// كونستركتور
   const ProfilePage({
     super.key,
     required this.userEmail,
@@ -37,12 +48,14 @@ class _ProfilePageState extends State<ProfilePage> {
   final _nameController = TextEditingController();
   final _passController = TextEditingController();
   final AuthenticationService _authService = AuthenticationService();
+  final DatabaseService _dbService = DatabaseService();
 
   String _fullPhoneNumber = "";
   bool _isLoading = true;
   bool _isSaving = false;
   String _verificationId = "";
 
+  // تهيئه كل حقل بالبيانات الأوليه
   @override
   void initState() {
     super.initState();
@@ -53,78 +66,61 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     _nameController.text = widget.initialName ?? "";
     _phoneController = TextEditingController(
-        text: widget.initialPhoneNumber?.replaceFirst('+966', '') ?? ""
+        text: widget.initialPhoneNumber?.replaceFirst('+966', '') ?? "" //يقص المفتاح
     );
     _fullPhoneNumber = widget.initialPhoneNumber ?? "";
-    _loadUserData();
+   //استدعيت خوارزميه الجلب من ملف الداتا بيس
+    _dbService.loadUserData(
+      nameController: _nameController,
+      phoneController: _phoneController,
+      emailController: _emailController,
+      mounted: mounted,
+      setLoading: (val) => setState(() => _isLoading = val),
+      setFullPhone: (val) => _fullPhoneNumber = val,
+      updateState: setState,
+    );
   }
+// ---------------------------------------------------------
+//  (رابعا) عمليات الحفظ والجلب والمنطق لها صله بملف الداتا بيس وملف المصادقه ويوزر مودل
+// ---------------------------------------------------------
 
-  Future<void> _loadUserData() async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        DocumentSnapshot doc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .get();
-
-        if (doc.exists && mounted) {
-          Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-          setState(() {
-            if (_nameController.text.isEmpty) _nameController.text = data['name'] ?? "";
-            if (data['phone'] != null) {
-              _phoneController.text = data['phone'].replaceFirst('+966', '');
-              _fullPhoneNumber = data['phone'];
-            }
-            if (data['email'] != null) _emailController.text = data['email'];
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint("خطأ في جلب البيانات: $e");
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  // --- دالة الحفظ النهائية في Firestore ---
-  // --- دالة الحفظ النهائية (تم إضافة تحديث الباسوورد بواسطة Gemini) ---
+  // الحفظ النهائي في الفاير ستور
   Future<void> _finalSave() async {
     setState(() => _isSaving = true);
     try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
+      fb.User? currentUser = fb.FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
-      // 1. تحديث كلمة المرور في Firebase Auth (إذا كانت مدخلة ومسموح بها)
+      // 1. في حال كان المستخدم طالب تغيير الكلمه وسامحين له نحفظها هنا بشكل نهائي في المصادقه
       if (widget.canEditPassword && _passController.text.trim().isNotEmpty) {
         if (_passController.text.trim().length < 6) {
           _showError("كلمة المرور يجب أن تكون 6 خانات على الأقل");
           return;
         }
         await currentUser.updatePassword(_passController.text.trim());
-        debugPrint("تم تحديث كلمة المرور في Auth بنجاح");
+        debugPrint("تم تحديث كلمة المرور في Auth بنجاح"); //رساله تطلع لي انا
       }
 
-      // 2. تحديث البيانات في Firestore (بإضافة الحقول المطلوبة: uid و provider)
-      await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).set({
-        'email': _emailController.text.trim(),           // String
-        'isProfileComplete': true,                       // Boolean
-        'lastUpdate': FieldValue.serverTimestamp(),      // Timestamp
-        'name': _nameController.text.trim(),             // String
-        'phone': _fullPhoneNumber.trim(),                // String
-        'provider': widget.loginProvider,               // String (phone, google, email)
-        'userId': currentUser.uid,                          // String
-      }, SetOptions(merge: true));
+      // 2.تحديث البيانات وحفظها في الفاير ستور
+      final updatedUser = RegularUser(
+        userId: currentUser.uid,
+        name: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _fullPhoneNumber.trim(),
+        isProfileComplete: true,
+        provider: widget.loginProvider,
+      );
 
+      await _dbService.saveProfile(updatedUser); // استدعاء دالة الحفظ
+
+       // 3. رساله النجاح ثم الانتظار قليلا وبعدها التوجه تلقائيا للهوم
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text("تم تحديث البيانات وكلمة المرور بنجاح ✅"),
+              content: Text("تم تحديث البيانات وكلمة المرور بنجاح "),
               backgroundColor: Colors.green
           ),
         );
-
-        // ننتظر قليلاً ليقرأ المستخدم الرسالة ثم نتوجه للهوم
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) {
             Navigator.pushAndRemoveUntil(
@@ -135,12 +131,14 @@ class _ProfilePageState extends State<ProfilePage> {
           }
         });
       }
-    } on FirebaseAuthException catch (e) {
+      // هنا في حطيت أبرز رسائل الخطأ من المصادقه بالفير بيس وخليتها بالعربي حتى تكون مفهومه اكثر
+    } on fb.FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         _showError("لأمانك، يرجى تسجيل الخروج والدخول مجدداً لتغيير كلمة السر");
       } else {
         _showError("خطأ في تغيير كلمة السر: ${e.message}");
       }
+      // هنا لو صار خطأ في عمليه الحفظ النهائي
     } catch (e) {
       _showError("حدث خطأ غير متوقع: $e");
     } finally {
@@ -148,60 +146,46 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // --- دالة الحفظ الذكية ---
-  // --- دالة الحفظ الذكية المحدثة (رند & Gemini) ---
+  // الحفظ مع التدقيق على المعلومات المدخلة وصلاحيتها قبل الإعتماد في الفاير ستور
   Future<void> _onSavePressed() async {
     final String enteredEmail = _emailController.text.trim();
     final String enteredName = _nameController.text.trim();
 
-    // 1. التحقق من الحقول الفارغة
+    // 1. نتأكد انه مافي شيئ فاضي
     if (enteredName.isEmpty || _fullPhoneNumber.trim().isEmpty) {
-      _showError("الرجاء إدخال الاسم ورقم الجوال أولاً");
+      _showError("الرجاء إدخال الاسم ورقم الجوال أولاً"); // اذا فيه فراغ خله يرجع يعبي
       return;
     }
-
     setState(() => _isSaving = true);
 
     try {
-      User? currentUser = FirebaseAuth.instance.currentUser;
+      fb.User? currentUser = fb.FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
-      // 2. فحص هل الإيميل مستخدم بالفعل (في حال كان الحقل متاحاً للتعديل)
-      // فقط إذا كان المستخدم داخل بالجوال (isEmailLocked = false) أو غير إيميله بطريقة ما
+      // 2. لما دخلت بالجوال --> نتأكد انه الايميل ماقد استخدم
       if (widget.loginProvider == 'phone' && enteredEmail.isNotEmpty) {
-        final emailCheck = await FirebaseFirestore.instance
-            .collection('users')
-            .where('email', isEqualTo: enteredEmail)
-            .get();
+        bool isTaken = await _dbService.isFieldTaken('email', enteredEmail, currentUser.uid);
 
-        // إذا وجدنا إيميل مطابق لمستخدم آخر (UID مختلف)
-        if (emailCheck.docs.isNotEmpty && emailCheck.docs.first.id != currentUser.uid) {
+        if (isTaken) {
           _showError("عذراً، هذا البريد الإلكتروني مسجل بالفعل بحساب آخر!");
           return;
         }
       }
 
-      // 3. فحص رقم الجوال والتعامل مع الربط (OTP)
+      // حفظت قيمه تعلمني لو رقم الجوال تغير أو لا
       bool isPhoneChanged = _fullPhoneNumber.trim() != (currentUser.phoneNumber ?? "");
 
-      // إذا كان المستخدم داخل بالإيميل وغير الرقم -> نطلب تحقق للربط
+      // 3. لما دخلت بالإيميل --> نتأكد انه الرقم ماقد استخدم
       if (widget.loginProvider != 'phone' && isPhoneChanged) {
+        bool isTaken = await _dbService.isFieldTaken('phone', _fullPhoneNumber.trim(), currentUser.uid);
 
-        // فحص أولي للجوال في Firestore
-        final phoneCheck = await FirebaseFirestore.instance
-            .collection('users')
-            .where('phone', isEqualTo: _fullPhoneNumber.trim())
-            .get();
-
-        if (phoneCheck.docs.isNotEmpty && phoneCheck.docs.first.id != currentUser.uid) {
+        if (isTaken) {
           _showError("عذراً، رقم الجوال هذا مرتبط بحساب آخر بالفعل!");
           return;
         }
-
-        // إذا الرقم سليم، نبدأ عملية الـ OTP
         _startPhoneVerification();
       } else {
-        // 4. الحفظ النهائي إذا كان كل شيء سليماً (الاسم، الإيميل، أو رقم لم يتغير)
+        // 4. الحفظ النهائي إذا كان كل شيء تمام
         await _finalSave();
       }
     } catch (e) {
@@ -211,7 +195,11 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // --- دالة إرسال الكود للربط ---
+// ---------------------------------------------------------
+//  (خامسا) التحقق وصفحاته
+// ---------------------------------------------------------
+
+  // داله ارسال الكود عشان عمليه ربط الجوال .1
   void _startPhoneVerification() async {
     setState(() => _isSaving = true);
     await _authService.verifyPhoneNumber(
@@ -230,20 +218,19 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // --- نافذة إدخال كود الـ OTP ---
-  // --- نافذة إدخال كود الـ OTP (تحديث الشكل فقط) ---
+  // تصميم شكل نافذه ارخال كود التجقق .2
   void _showOtpDialog() {
-    // نحتفظ بنفس المنطق الأصلي: قائمة من الـ Controllers
+    // صممت ليست به 6 اماكن لان كود التحقق يتكون منها
     final List<TextEditingController> otpControllers = List.generate(6, (index) => TextEditingController());
-
+    // تصميم شكل الشيت اللي راح تظهر من الاسفل
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent, // لجعل الحواف العلوية تظهر بشكل دائري خلفية بيضاء
+      backgroundColor: Colors.transparent,
+      // نحسب حساب انه النافذه بالاسفل فممكن احتاج مساحه اكبر عشان اكتب الكود لو طلعت لوحه المفاتيح
       builder: (context) => Padding(
         padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
         child: Container(
-          // استخدام نفس الـ Decoration الموحد للنافذة
           padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -252,10 +239,9 @@ class _ProfilePageState extends State<ProfilePage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // خط السحب العلوي للجمالية
+              // خط علوي للديكور
               Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
               const SizedBox(height: 25),
-
               const Text("تحقق من الرقم لربط الحساب",
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
               const SizedBox(height: 10),
@@ -263,21 +249,20 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
               const SizedBox(height: 30),
 
-              // صف مربعات الـ OTP الموحدة شكلياً
+              // تصميم شكل الست بوكسات اللي فيها بندخل الارقام
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(6, (index) => SizedBox(
                   width: 45,
                   child: TextField(
-                    // نحتفظ بالـ Controller الأصلي
+                    // سويت متغير عشان اخذ من اللست رقم لحال
                     controller: otpControllers[index],
                     autofocus: index == 0,
                     textAlign: TextAlign.center,
                     keyboardType: TextInputType.number,
                     maxLength: 1,
-                    // استخدام نفس الـ Style الموحد للنص
+                    // الخط ولونه داخل البوكس
                     style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF673AB7)),
-                    // تطبيق نفس الـ Decoration الموحد للمربعات (بدون منطق تغيير اللون للخطأ)
                     decoration: InputDecoration(
                       counterText: "",
                       fillColor: const Color(0xFFFBF9FF),
@@ -292,9 +277,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       ),
                     ),
                     onChanged: (value) {
-                      // التنقل التلقائي للأمام عند الكتابة
+                      // نمشي للي بعده اذا دخلت رقم
                       if (value.length == 1 && index < 5) FocusScope.of(context).nextFocus();
-                      // التنقل التلقائي للخلف عند الحذف
+                      // نرجع للي قبله اذا حذفت رقم
                       if (value.isEmpty && index > 0) FocusScope.of(context).previousFocus();
                     },
                   ),
@@ -305,15 +290,13 @@ class _ProfilePageState extends State<ProfilePage> {
 
               WaterRippleButton(
                 text: "تأكيد وربط الحساب",
-                // نحتفظ بنفس منطق الحفظ الأصلي
                 onTap: () async {
-                  String smsCode = otpControllers.map((e) => e.text).join();
+                  String smsCode = otpControllers.map((e) => e.text).join(); //جمعت الارقام من كل بوكس
                   try {
-                    await _authService.linkPhoneNumber(_verificationId, smsCode);
-                    if (mounted) Navigator.pop(context); // إغلاق الشيت
-                    await _finalSave(); // الحفظ النهائي في Firestore
+                    await _authService.linkPhoneNumber(_verificationId, smsCode); //ارسلنا الكود للفاير بيس عشان تربط الرقم
+                    if (mounted) Navigator.pop(context); // نسكر الشيت
+                    await _finalSave();
                   } catch (e) {
-                    // نحتفظ بنفس منطق إظهار الخطأ الأصلي عبر SnackBar
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("كود التحقق غير صحيح")));
                   }
                 },
@@ -337,6 +320,7 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
+// داله للتنظيف حتى لا تستهلك الذاكره
   @override
   void dispose() {
     _emailController.dispose();
@@ -345,18 +329,21 @@ class _ProfilePageState extends State<ProfilePage> {
     _passController.dispose();
     super.dispose();
   }
-
+// ---------------------------------------------------------
+//  (سادسا) التصميم وشكل الصفحه
+// ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
     // تعريف حالات القفل بناءً على طريقة الدخول
     bool isEmailLocked = widget.loginProvider == 'email' || widget.loginProvider == 'google';
     bool isPhoneLocked = widget.loginProvider == 'phone';
-
+    //شكل صفحه الملف الشخصي
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // سهم لما نضغطه يوجهني للهوم
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF5A4A75)),
           onPressed: () => Navigator.pushAndRemoveUntil(
@@ -375,7 +362,6 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF5A4A75))),
                 const SizedBox(height: 40),
 
-                // حقل الاسم
                 CustomInputField(
                   label: "الاسم الكامل",
                   hintText: "أدخل اسمك هنا",
@@ -384,17 +370,16 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 15),
 
-                // حقل الإيميل (مقفل إذا دخل بالإيميل أو جوجل)
                 CustomInputField(
                   label: "البريد الإلكتروني",
                   hintText: "example@mail.com",
                   controller: _emailController,
-                  readOnly: isEmailLocked,
+                  readOnly: isEmailLocked, //نقفله اذا داخلين بالايميل او قوقل
                   fillColor: isEmailLocked ? Colors.grey.withOpacity(0.2) : Colors.white.withOpacity(0.7),
                 ),
                 const SizedBox(height: 15),
 
-                // حقل رقم الهاتف
+                // عشان رقم الجوال له نوع فيلد غير فاحتجنا نسوي الليبل بشكل منفصل وننسقه
                 const Align(
                   alignment: Alignment.centerRight,
                   child: Padding(
@@ -403,8 +388,6 @@ class _ProfilePageState extends State<ProfilePage> {
                         style: TextStyle(color: Color(0xFF5A4A75), fontWeight: FontWeight.bold, fontSize: 14)),
                   ),
                 ),
-
-                // قفل الحقل وتغيير لونه إذا كان الدخول بالجوال
                 AbsorbPointer(
                   absorbing: isPhoneLocked,
                   child: IntlPhoneField(
@@ -427,10 +410,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 const SizedBox(height: 15),
 
-                // حقل كلمة السر
                 CustomInputField(
                   label: "كلمة السر الجديدة",
-                  hintText: widget.canEditPassword ? "أدخل كلمة السر الجديدة" : "التعديل متاح عبر الاستعادة فقط",
+                  hintText: widget.canEditPassword
+                      ? "أدخل كلمة السر الجديدة"
+                      : "التعديل متاح عبر الاستعادة فقط",
                   controller: _passController,
                   isPass: true,
                   readOnly: !widget.canEditPassword,
@@ -439,7 +423,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
                 const SizedBox(height: 35),
 
-                // زر الحفظ
                 WaterRippleButton(
                     text: _isSaving ? "جاري الحفظ..." : "حفظ التعديلات",
                     width: 200,
@@ -450,11 +433,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 const SizedBox(height: 30),
                 _buildProviderStatus(),
 
-                // زر تسجيل الخروج
                 TextButton.icon(
                   onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
+                    await fb.FirebaseAuth.instance.signOut();
                     if (mounted) {
+                      //لما اطلع يودين لصفحه الدخول
                       Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
                     }
                   },
@@ -468,7 +451,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
-
+  //لاظهار طريقه الدخول المستخدمه
   Widget _buildProviderStatus() {
     IconData icon;
     String providerName;

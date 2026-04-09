@@ -1,69 +1,58 @@
 // authentication_serv.dart
-// Rand - Full Authentication Service (Email, Phone, & Google with Smart Linking)
-import 'package:firebase_auth/firebase_auth.dart';
+// Rand
+// ---------------------------------------------------------
+//  (اولا) استيراد الباكجيز
+// ---------------------------------------------------------
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'database_serv.dart';
+import '../models/user_model.dart';
 
+// ---------------------------------------------------------
+//  (ثانيا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class AuthenticationService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final fb.FirebaseAuth _auth = fb.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-
+  final DatabaseService _dbService = DatabaseService();
   // --- حفظ/تحديث المستخدم في Firestore ---
   // نستخدم merge: true لضمان عدم مسح البيانات القديمة
-  Future<void> _saveUserData(User user, {String? providedName}) async {
-    // 1. جلب بيانات المستخدم الحالية من الفايرستور
-    DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+  Future<void> _saveUserData(fb.User user, {String? providedName, String? provider}) async {
+    final modelUser = RegularUser(
+      userId: user.uid,
+      name: providedName ?? user.displayName ?? "مستخدم جديد",
+      email: user.email ?? '',
+      phone: user.phoneNumber,
+      isProfileComplete: false,
+      provider: provider ?? "unknown",
+    );
 
-    Map<String, dynamic> dataToSave = {
-      'email': user.email,
-      'phone': user.phoneNumber,
-      'lastUpdate': FieldValue.serverTimestamp(),
-    };
-
-    // 2. التحقق: هل المستخدم لديه اسم مخزن مسبقاً؟
-    if (userDoc.exists && userDoc.data() != null) {
-      Map<String, dynamic> existingData = userDoc.data() as Map<String, dynamic>;
-      if (existingData.containsKey('name') && existingData['name'] != null && existingData['name'].toString().isNotEmpty) {
-        // إذا الاسم موجود، لا نغيره ببيانات تسجيل الدخول الجديدة (مثل اسم قوقل)
-        // نتركه كما هو في الفايرستور
-      } else {
-        // إذا الحساب موجود بس لسبب ما الاسم فارغ، نضع اسم افتراضي
-        dataToSave['name'] = user.displayName ?? "مستخدم ضالة";
-      }
-    } else {
-      // 3. إذا كان مستخدم جديد كلياً (أول مرة يسجل)
-      dataToSave['name'] = providedName ?? user.displayName ?? "مستخدم جديد";
-      dataToSave['isProfileComplete'] = false;
-    }
-
-    // الحفظ مع خاصية merge لضمان عدم مسح أي حقول أخرى (مثل الصور أو التقييمات)
-    await _firestore.collection('users').doc(user.uid).set(dataToSave, SetOptions(merge: true));
+    await _dbService.updateOrCreateUser(modelUser);
   }
 
   // --- 1. تسجيل الدخول بجوجل (مع الربط التلقائي) ---
-  Future<User?> signInWithGoogle() async {
+  Future<fb.User?> signInWithGoogle() async {
     try {
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return null;
 
       final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
+      final credential = fb.GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      User? currentUser = _auth.currentUser;
+      fb.User? currentUser = _auth.currentUser;
 
       if (currentUser != null) {
         try {
           final result = await currentUser.linkWithCredential(credential);
-          await _saveUserData(result.user!);
+          await _saveUserData(result.user!, provider: 'google');
           return result.user;
-        } on FirebaseAuthException catch (e) {
+        } on fb.FirebaseAuthException catch (e) {
           if (e.code == 'credential-already-in-use') {
             final result = await _auth.signInWithCredential(credential);
-            await _saveUserData(result.user!);
+            await _saveUserData(result.user!, provider: 'google');
             return result.user;
           } else {
             throw Exception(e.message);
@@ -71,7 +60,7 @@ class AuthenticationService {
         }
       } else {
         final result = await _auth.signInWithCredential(credential);
-        await _saveUserData(result.user!);
+        await _saveUserData(result.user!, provider: 'google');
         return result.user;
       }
     } catch (e) {
@@ -81,12 +70,12 @@ class AuthenticationService {
   }
 
   // --- 2. تسجيل دخول بالإيميل ---
-  Future<User?> login(String email, String password) async {
+  Future<fb.User?> login(String email, String password) async {
     try {
       final result = await _auth.signInWithEmailAndPassword(
           email: email, password: password);
 
-      User? user = result.user;
+      fb.User? user = result.user;
       await user?.reload();
       user = _auth.currentUser;
 
@@ -95,9 +84,10 @@ class AuthenticationService {
         throw Exception("الرجاء تفعيل البريد الإلكتروني أولاً.");
       }
 
-      await _saveUserData(user!);
+
+      await _saveUserData(user!, provider: 'email');
       return user;
-    } on FirebaseAuthException catch (e) {
+    } on fb.FirebaseAuthException catch (e) {
       // هنا نوحد جميع رسائل خطأ تسجيل الدخول في رسالة واحدة مفهومة
       // الأكواد الشائعة: user-not-found, wrong-password, invalid-credential
       if (e.code == 'user-not-found' ||
@@ -116,7 +106,7 @@ class AuthenticationService {
   }
 
   // --- 3. تسجيل مستخدم جديد ---
-  Future<User?> register({
+  Future<fb.User?> register({
     required String username,
     required String email,
     required String password,
@@ -130,15 +120,15 @@ class AuthenticationService {
 
       final result = await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
-      User? user = result.user;
+      fb.User? user = result.user;
 
       if (user != null) {
         await user.updateDisplayName(username);
-        await _saveUserData(user, providedName: username);
+        await _saveUserData(user, providedName: username, provider: 'email');
         await user.sendEmailVerification();
       }
       return user;
-    } on FirebaseAuthException catch (e) {
+    } on fb.FirebaseAuthException catch (e) {
       // هنا نحول أكواد الفايربيس إلى رسائل عربية
       switch (e.code) {
         case 'email-already-in-use':
@@ -166,15 +156,15 @@ class AuthenticationService {
     try {
       await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber,
-        verificationCompleted: (PhoneAuthCredential credential) async {
+        verificationCompleted: (fb.PhoneAuthCredential credential) async {
           // التحقق التلقائي (في بعض أجهزة أندرويد)
-          User? user = _auth.currentUser;
+          fb.User? user = _auth.currentUser;
           if (user != null) {
             await user.linkWithCredential(credential);
-            await _saveUserData(user);
+            await _saveUserData(user, provider: 'phone');
           }
         },
-        verificationFailed: (FirebaseAuthException e) => onError(e.message ?? "حدث خطأ"),
+        verificationFailed: (fb.FirebaseAuthException e) => onError(e.message ?? "حدث خطأ"),
         codeSent: (verificationId, resendToken) => onCodeSent(verificationId),
         codeAutoRetrievalTimeout: (verificationId) {},
       );
@@ -186,18 +176,18 @@ class AuthenticationService {
   // --- 5. دالة الربط النهائية (تستخدم في البروفايل) ---
   Future<void> linkPhoneNumber(String verificationId, String smsCode) async {
     try {
-      final credential = PhoneAuthProvider.credential(
+      final credential = fb.PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: smsCode,
       );
 
-      User? user = _auth.currentUser;
+      fb.User? user = _auth.currentUser;
       if (user != null) {
         // نربط الرقم بالحساب الحالي (الإيميل) لتوحيد الـ UID
         final result = await user.linkWithCredential(credential);
-        await _saveUserData(result.user!);
+        await _saveUserData(result.user!, provider: 'phone');
       }
-    } on FirebaseAuthException catch (e) {
+    } on fb.FirebaseAuthException catch (e) {
       if (e.code == 'credential-already-in-use') {
         throw Exception("هذا الرقم مرتبط بحساب آخر بالفعل.");
       }
@@ -206,14 +196,14 @@ class AuthenticationService {
   }
 
   // --- 6. تسجيل الدخول العادي بالـ OTP (في حال لم يكن هناك حساب حالي) ---
-  Future<User?> signInWithOTP(String verificationId, String smsCode) async {
+  Future<fb.User?> signInWithOTP(String verificationId, String smsCode) async {
     try {
-      final credential = PhoneAuthProvider.credential(
+      final credential = fb.PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: smsCode,
       );
       final result = await _auth.signInWithCredential(credential);
-      await _saveUserData(result.user!);
+      await _saveUserData(result.user!, provider: 'phone');
       return result.user;
     } catch (e) {
       throw Exception("كود التحقق غير صحيح");

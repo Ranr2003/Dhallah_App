@@ -1,23 +1,32 @@
 // login_page.dart
-// تم التعديل بواسطة رند بدعم Gemini (إضافة الفحص الذكي لحالة الحساب وتوجيه المستخدم الجديد)
+// Rand
+// ---------------------------------------------------------
+// (أولا) استيراد المكتبوات والباكجيز
+// ---------------------------------------------------------
 import 'dart:async';
-import 'package:dhallah_app/screens/account_info_page.dart';
-import 'package:dhallah_app/services/authentication_serv.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:intl_phone_field/intl_phone_field.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// ---------------------------------------------------------
+// (ثانيا) استيراد الصفحات الأخرى لإستخدامها
+// ---------------------------------------------------------
+import '../services/authentication_serv.dart';
+import '../services/database_serv.dart';
 import '../widgets/login_signup_background.dart';
 import '../widgets/custom_button1.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/custom_text_link.dart';
-import 'package:flutter/gestures.dart';
 import '../screens/signup_page.dart';
 import '../screens/ForgotPassword_page.dart';
-import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../screens/account_info_page.dart';
 import '../screens/home_page.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 
+// ---------------------------------------------------------
+//  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
 
@@ -29,10 +38,9 @@ class _LoginPageState extends State<LoginPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final AuthenticationService _authService = AuthenticationService();
+  final DatabaseService _dbService = DatabaseService();
 
   bool _isLoading = false;
-
-  // --- متغيرات الجوال والتايمر والـ OTP ---
   bool isCodeSent = false;
   String _phoneNumber = "";
   String _fullPhoneNumber = "";
@@ -40,11 +48,14 @@ class _LoginPageState extends State<LoginPage> {
   String _verificationId = "";
   List<String> _otpCode = ["", "", "", "", "", ""];
   bool _isOtpError = false;
-
   Timer? _timer;
   int _start = 180;
   bool _isTimerActive = false;
 
+// ---------------------------------------------------------
+//  (رابعا) بعض الدوال المهمه مثل تنظيف و الؤقت و ارسال رابط الاستعاده والكود والانتقال  ورسائل  الخطأ
+// ---------------------------------------------------------
+  // تنظف
   @override
   void dispose() {
     _emailController.dispose();
@@ -53,25 +64,15 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
-  // دالة مساعدة لحفظ طريقة الدخول في ذاكرة الجهاز
+  // تحفظ طريقه الدخول
   Future<void> _saveLoginMethod(String method) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('loginMethod', method);
   }
 
-  // دالة ذكية لتوجيه المستخدم بناءً على اكتمال ملفه الشخصي
-  void _redirectUser(User user, String provider, String emailOrPhone) async {
-    DocumentSnapshot userDoc = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .get();
-
-    bool isComplete = false;
-    if (userDoc.exists) {
-      var data = userDoc.data() as Map<String, dynamic>;
-      isComplete = data['isProfileComplete'] ?? false;
-    }
-
+  // توجيه المستخدم بحسب حاله اكتمال الملف الشخصي
+  void _redirectUser(fb.User user, String provider, String emailOrPhone) async {
+    bool isComplete = await _dbService.checkProfileCompletion(user.uid);
     if (mounted) {
       if (isComplete) {
         // إذا الحساب مكتمل يروح للهوم مباشرة
@@ -88,7 +89,7 @@ class _LoginPageState extends State<LoginPage> {
             builder: (context) => ProfilePage(
               userEmail: emailOrPhone,
               loginProvider: provider,
-              canEditPassword: false, // لا نسمح بتعديل الباسورد هنا (فقط من الاستعادة)
+              canEditPassword: false, // كلمه السر ممنوع يعدله
             ),
           ),
               (route) => false,
@@ -96,7 +97,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     }
   }
-
+//  للتايمر
   void startTimer(StateSetter setSheetState) {
     _isTimerActive = true;
     _start = 180;
@@ -112,7 +113,11 @@ class _LoginPageState extends State<LoginPage> {
       });
     });
   }
+// ---------------------------------------------------------
+//  (خامسا) التصميم والبناء
+// ---------------------------------------------------------
 
+// شيت لما يدخل برقم الجوال اللي تطلع من تحت
   void _showPhoneLoginSheet() {
     isCodeSent = false;
     _phoneError = null;
@@ -255,6 +260,7 @@ class _LoginPageState extends State<LoginPage> {
           counterText: "",
           fillColor: const Color(0xFFFBF9FF),
           filled: true,
+          // لو خطأ يحط الحدود بالاحمر
           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFFEEEEEE))),
           focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFF673AB7), width: 2)),
         ),
@@ -287,7 +293,7 @@ class _LoginPageState extends State<LoginPage> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
+// الرساله لما نضغط زر ابل ومايكروسوفت
   void _showComingSoonDialog(BuildContext context, String provider) {
     showDialog(
       context: context,
@@ -309,7 +315,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-
+// الشكل للصفحه
   @override
   Widget build(BuildContext context) {
     return LoginSignupBackground(
@@ -354,7 +360,7 @@ class _LoginPageState extends State<LoginPage> {
                     _buildSocialIcon(FontAwesomeIcons.microsoft, const Color(0xFF00A4EF), "مايكروسوفت", () => _showComingSoonDialog(context, "مايكروسوفت")),
                     _buildSocialIcon(FontAwesomeIcons.google, const Color(0xFFDB4437), "قوقل", () async {
                       setState(() => _isLoading = true);
-                      User? user = await _authService.signInWithGoogle();
+                      fb.User? user = await _authService.signInWithGoogle();
                       setState(() => _isLoading = false);
                       if (user != null) {
                         await _saveLoginMethod("google");
