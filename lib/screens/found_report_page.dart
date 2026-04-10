@@ -1,7 +1,6 @@
 // lib/screens/found_report_page.dart
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import '../models/item_model.dart';
 import '../models/report_model.dart';
@@ -9,6 +8,7 @@ import '../services/item_serv.dart';
 import '../widgets/custom_widgets.dart';
 import 'map_picker_page.dart';
 import '../utils/app_theme.dart';
+import '../services/authentication_serv.dart';
 
 class FoundReportPage extends StatefulWidget {
   const FoundReportPage({super.key});
@@ -18,6 +18,9 @@ class FoundReportPage extends StatefulWidget {
 }
 
 class _FoundReportPageState extends State<FoundReportPage> {
+  final ItemService _itemService = ItemService();
+  final AuthenticationService _authService = AuthenticationService();
+
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   final TextEditingController _typeController  = TextEditingController();
@@ -30,7 +33,6 @@ class _FoundReportPageState extends State<FoundReportPage> {
   PickedLocation? _pickedLocation;
   bool _isPublishing = false;
 
-  final ItemService _itemService = ItemService();
 
   /// Disposes all text controllers to free resources.
   @override
@@ -130,7 +132,7 @@ class _FoundReportPageState extends State<FoundReportPage> {
 
       final report = Report(
         type: "found",
-        userId: FirebaseAuth.instance.currentUser?.uid ?? 'unknown',
+        userId: _authService.currentUserId,
         item: item,
         locationName: _placeController.text.trim(),
         coordinates: _pickedLocation!.coordinates,
