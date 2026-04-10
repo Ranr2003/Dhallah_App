@@ -211,6 +211,8 @@ class AuthenticationService {
   }
 
   // --- وظائف مساعدة ---
+  String get currentUserId => _auth.currentUser?.uid ?? 'unknown';
+
   bool validatePassword(String password) => password.length >= 6;
 
   Future<void> logout() async {
