@@ -219,4 +219,7 @@ class AuthenticationService {
     await _googleSignIn.signOut();
     await _auth.signOut();
   }
+  fb.User? getCurrentUser() {
+    return _auth.currentUser;
+  }
 }

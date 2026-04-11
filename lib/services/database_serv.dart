@@ -98,4 +98,17 @@ class DatabaseService {
     // نرجع true فقط إذا وجدنا شخصاً آخر (UID مختلف) يستخدم نفس القيمة
     return query.docs.any((doc) => doc.id != currentUid);
   }
+  // دالة لجلب بيانات المستخدم كـ Object (للاستخدام في الهوم بيج وغيرها)
+  Future<RegularUser?> getUserById(String uid) async {
+    try {
+      DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
+      if (doc.exists && doc.data() != null) {
+        // تحويل البيانات من Firestore إلى موديل RegularUser
+        return RegularUser.fromMap(doc.data() as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint("خطأ في جلب كائن المستخدم: $e");
+    }
+    return null;
+  }
 }

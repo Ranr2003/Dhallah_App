@@ -30,7 +30,6 @@ class ItemService {
     return _firestore
         .collection('reports')
         .where('userId', isEqualTo: uid)
-        .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
         .map((doc) => Report.fromMap(doc.data(), doc.id))
