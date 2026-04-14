@@ -52,6 +52,8 @@ class AuthenticationService {
         } on fb.FirebaseAuthException catch (e) {
           if (e.code == 'credential-already-in-use') {
             final result = await _auth.signInWithCredential(credential);
+            // --- إضافة فحص الحظر هنا ---
+            await _checkIfBanned(result.user!.uid);
             await _saveUserData(result.user!, provider: 'google');
             return result.user;
           } else {
@@ -79,17 +81,27 @@ class AuthenticationService {
       await user?.reload();
       user = _auth.currentUser;
 
-      if (user != null && !user.emailVerified) {
-        await logout();
-        throw Exception("الرجاء تفعيل البريد الإلكتروني أولاً.");
+      if (user != null) {
+        // --- (التعديل هنا) فحص الحظر قبل أي خطوة أخرى ---
+        final userData = await _dbService.getUserById(user.uid);
+        if (userData is RegularUser && userData.isBanned) {
+          await logout(); // تسجيل خروجه فوراً
+          throw "عذراً، هذا الحساب محظور من قبل الإدارة.";
+        }
+        // ------------------------------------------
+
+        if (!user.emailVerified) {
+          await logout();
+          throw Exception("الرجاء تفعيل البريد الإلكتروني أولاً.");
+        }
+
+
+        await _saveUserData(user, provider: 'email');
       }
-
-
-      await _saveUserData(user!, provider: 'email');
       return user;
     } on fb.FirebaseAuthException catch (e) {
-      // هنا نوحد جميع رسائل خطأ تسجيل الدخول في رسالة واحدة مفهومة
-      // الأكواد الشائعة: user-not-found, wrong-password, invalid-credential
+      // 1. التعديل الأول: فحص الحظر حتى لو حدث خطأ من فايربيس (اختياري للأمان)
+      // لكن الأهم هو توحيد الرسائل كما فعلتِ:
       if (e.code == 'user-not-found' ||
           e.code == 'wrong-password' ||
           e.code == 'invalid-credential' ||
@@ -100,7 +112,16 @@ class AuthenticationService {
       } else {
         throw "حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة ثانية.";
       }
+
     } catch (e) {
+      // 2. التعديل الثاني (المهم جداً):
+      // هنا الكود يمسك أي "throw" يدوي قمنا به نحن (مثل رسالة الحظر)
+      if (e.toString().contains("محظور")) {
+        // نستخدم rethrow لإرسال نفس الرسالة "عذراً، هذا الحساب محظور..." للواجهة
+        rethrow;
+      }
+
+      // أي خطأ آخر غير الحظر وغير أخطاء الفايربيس، يظهر الرسالة العامة
       throw "عذراً، حدث خطأ غير متوقع.";
     }
   }
@@ -203,10 +224,18 @@ class AuthenticationService {
         smsCode: smsCode,
       );
       final result = await _auth.signInWithCredential(credential);
+      // --- (التعديل الجوهري هنا) ---
+      final userData = await _dbService.getUserById(result.user!.uid);
+      if (userData is RegularUser && userData.isBanned) {
+        await logout(); // طرده فوراً
+        throw "عذراً، هذا الحساب محظور من قبل الإدارة.";
+      }
+      // ----------------------------
       await _saveUserData(result.user!, provider: 'phone');
       return result.user;
     } catch (e) {
-      throw Exception("كود التحقق غير صحيح");
+      if (e.toString().contains("محظور")) rethrow;
+      throw Exception("كود التحقق غير صحيح أو الحساب محظور");
     }
   }
 
@@ -221,5 +250,14 @@ class AuthenticationService {
   }
   fb.User? getCurrentUser() {
     return _auth.currentUser;
+  }
+
+  // دالة مساعدة للتأكد من أن المستخدم ليس محظوراً
+  Future<void> _checkIfBanned(String uid) async {
+    final userData = await _dbService.getUserById(uid);
+    if (userData is RegularUser && userData.isBanned) {
+      await logout(); // تسجيل خروج فوري
+      throw "عذراً، هذا الحساب محظور من قبل الإدارة.";
+    }
   }
 }

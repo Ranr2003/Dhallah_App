@@ -255,7 +255,22 @@ class _LoginPageState extends State<LoginPage> {
                             _redirectUser(user, "phone", _fullPhoneNumber);
                           }
                         } catch (e) {
-                          setSheetState(() => _isOtpError = true);
+                          String errorText = e.toString();
+                          if (errorText.contains("محظور")) {
+                            // إذا كان الحساب محظوراً، نغلق الشيت ونظهر الرسالة في الصفحة الرئيسية
+                            if (mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(errorText.replaceAll("Exception:", "").trim()),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          } else {
+                            // إذا كان الخطأ مجرد رمز خطأ، نبقي الشيت مفتوحاً ونظهر خطأ الـ OTP
+                            setSheetState(() => _isOtpError = true);
+                          }
                         }
                       }
                     },
@@ -383,12 +398,23 @@ class _LoginPageState extends State<LoginPage> {
                     _buildSocialIcon(FontAwesomeIcons.apple, Colors.black, "أبل", () => _showComingSoonDialog(context, "أبل")),
                     _buildSocialIcon(FontAwesomeIcons.microsoft, const Color(0xFF00A4EF), "مايكروسوفت", () => _showComingSoonDialog(context, "مايكروسوفت")),
                     _buildSocialIcon(FontAwesomeIcons.google, const Color(0xFFDB4437), "قوقل", () async {
-                      setState(() => _isLoading = true);
-                      fb.User? user = await _authService.signInWithGoogle();
-                      setState(() => _isLoading = false);
-                      if (user != null) {
-                        await _saveLoginMethod("google");
-                        _redirectUser(user, "google", user.email ?? "");
+                      try {
+                        setState(() => _isLoading = true);
+                        fb.User? user = await _authService.signInWithGoogle();
+                        setState(() => _isLoading = false);
+                        if (user != null) {
+                          await _saveLoginMethod("google");
+                          _redirectUser(user, "google", user.email ?? "");
+                        }
+                      } catch (e) {
+                        setState(() => _isLoading = false);
+                        if (mounted) {
+                          // هنا نتأكد أن رسالة الحظر هي التي تظهر أولاً
+                          String errorMessage = e.toString().replaceAll("Exception:", "").trim();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(errorMessage), backgroundColor: Colors.redAccent),
+                          );
+                        }
                       }
                     }),
                     _buildSocialIcon(Icons.phone_android, const Color(0xFF673AB7), "رقم الجوال", _showPhoneLoginSheet),

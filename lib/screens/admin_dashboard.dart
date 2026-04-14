@@ -312,10 +312,22 @@ class _AdminDashboardState extends State<AdminDashboard> {
                   title: Text(user['name'] ?? "", style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.w600)),
                   subtitle: Text(user['email'] ?? "", style: const TextStyle(fontSize: 11)),
                   trailing: TextButton(
-                    onPressed: () => _showBanConfirmation(context, user['userId'], user['name'] ?? "", onlyBanned),
+                    onPressed: () {
+                      // نمرر userId، واسم المستخدم، وحالته الحالية (هل هو محظور أم لا)
+                      _showBanConfirmation(
+                          context,
+                          user['userId'],
+                          user['name'] ?? "",
+                          user['isBanned'] ?? false // نمرر الحالة الحالية بدقة من البيانات
+                      );
+                    },
                     child: Text(
-                      onlyBanned ? "فك الحظر" : "حظر",
-                      style: TextStyle(color: onlyBanned ? Colors.green : Colors.red, fontFamily: 'Cairo', fontWeight: FontWeight.bold),
+                      (user['isBanned'] ?? false) ? "فك الحظر" : "حظر",
+                      style: TextStyle(
+                          color: (user['isBanned'] ?? false) ? Colors.green : Colors.red,
+                          fontFamily: 'Cairo',
+                          fontWeight: FontWeight.bold
+                      ),
                     ),
                   ),
                 ),

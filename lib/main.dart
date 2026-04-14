@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'models/user_model.dart';
-import 'screens/admin_dashboard.dart';
+
 // استيراد الشاشات
 import 'screens/start_page.dart';
 import 'screens/login_page.dart';
@@ -32,7 +31,7 @@ class MyApp extends StatelessWidget {
       ),
 
       // 1. تحديد الصفحة التي يبدأ منها التطبيق (البداية)
-      initialRoute: '/admin_test',
+      initialRoute: '/',
 
       // 2. تعريف جدول المسارات
       routes: {
@@ -40,16 +39,7 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
         '/home': (context) => const HomePage(),
-        '/admin_test': (context) => AdminDashboard(
-          admin: Admin(
-            userId: "test_123",
-            name: "ليلى",
-            email: "admin@dallah.com",
-            adminLevel: "Super",
-          ),
-        ),
       },
-
     );
   }
 }

@@ -77,18 +77,16 @@ class AdminService {
       'isBanned': isBanned, // تحتاجين إضافة هذا الحقل في الفايرستور لاحقاً
     });
   }
-  // حظر أو فك حظر مستخدم
-// حظر أو فك حظر مستخدم (تم تصحيح المسمى من _db إلى _firestore)
-  Future<void> toggleUserBan(String userId, bool currentStatus) async {
+// 4. حظر أو فك حظر مستخدم (تم دمجها في دالة واحدة احترافية)
+  Future<void> toggleUserBan(String userId, bool currentBanStatus) async {
     try {
-      // تم تغيير _db إلى _firestore ليتطابق مع تعريفك في الأعلى
       await _firestore.collection('users').doc(userId).update({
-        'isBanned': !currentStatus, // يعكس الحالة
+        'isBanned': !currentBanStatus, // عكس الحالة الحالية
       });
-      print("تم تحديث حالة الحظر في الفايربيس بنجاح لليوزر: $userId");
+      debugPrint("User $userId ban status updated to: ${!currentBanStatus}");
     } catch (e) {
-      print("خطأ أثناء تحديث الحظر: $e");
-      rethrow; // نرفع الخطأ لنراه في التطبيق
+      debugPrint("Error updating ban status: $e");
+      rethrow;
     }
   }
   // داخل ملف admin_serv.dart
