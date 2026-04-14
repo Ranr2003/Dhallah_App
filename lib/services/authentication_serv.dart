@@ -14,6 +14,7 @@ import '../models/user_model.dart';
 class AuthenticationService {
   final fb.FirebaseAuth _auth = fb.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
+
   final DatabaseService _dbService = DatabaseService();
   // --- حفظ/تحديث المستخدم في Firestore ---
   // نستخدم merge: true لضمان عدم مسح البيانات القديمة
@@ -72,6 +73,7 @@ class AuthenticationService {
   }
 
   // --- 2. تسجيل دخول بالإيميل ---
+// --- 2. تسجيل دخول بالإيميل ---
   Future<fb.User?> login(String email, String password) async {
     try {
       final result = await _auth.signInWithEmailAndPassword(
@@ -82,50 +84,45 @@ class AuthenticationService {
       user = _auth.currentUser;
 
       if (user != null) {
-        // --- (التعديل هنا) فحص الحظر قبل أي خطوة أخرى ---
+        // فحص الحظر
         final userData = await _dbService.getUserById(user.uid);
         if (userData is RegularUser && userData.isBanned) {
-          await logout(); // تسجيل خروجه فوراً
-          throw "عذراً، هذا الحساب محظور من قبل الإدارة.";
+          await logout();
+          // نستخدم Exception لضمان ثبات الرسالة في الويب والجوال
+          throw Exception("عذراً، هذا الحساب محظور من قبل الإدارة.");
         }
-        // ------------------------------------------
 
         if (!user.emailVerified) {
           await logout();
           throw Exception("الرجاء تفعيل البريد الإلكتروني أولاً.");
         }
 
-
         await _saveUserData(user, provider: 'email');
       }
       return user;
     } on fb.FirebaseAuthException catch (e) {
-      // 1. التعديل الأول: فحص الحظر حتى لو حدث خطأ من فايربيس (اختياري للأمان)
-      // لكن الأهم هو توحيد الرسائل كما فعلتِ:
-      if (e.code == 'user-not-found' ||
-          e.code == 'wrong-password' ||
-          e.code == 'invalid-credential' ||
-          e.code == 'invalid-email') {
-        throw "البريد الإلكتروني أو كلمة السر غير صحيحة.";
+      // تحويل أخطاء Firebase لرسائل مفهومة
+      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        throw Exception("البريد الإلكتروني أو كلمة السر غير صحيحة.");
       } else if (e.code == 'too-many-requests') {
-        throw "تمت محاولة الدخول بشكل خاطئ كثيراً، جرب لاحقاً.";
+        throw Exception("محاولات كثيرة خاطئة، جرب لاحقاً.");
       } else {
-        throw "حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة ثانية.";
+        throw Exception("حدث خطأ في السيرفر، حاول مجدداً.");
       }
 
     } catch (e) {
-      // 2. التعديل الثاني (المهم جداً):
-      // هنا الكود يمسك أي "throw" يدوي قمنا به نحن (مثل رسالة الحظر)
-      if (e.toString().contains("محظور")) {
-        // نستخدم rethrow لإرسال نفس الرسالة "عذراً، هذا الحساب محظور..." للواجهة
-        rethrow;
+      // --- التعديل الجوهري هنا ---
+      // إذا كان الخطأ هو "محظور" أو أي رسالة قمنا نحن برميها كـ Exception
+      String errorMsg = e.toString();
+      if (errorMsg.contains("محظور") || errorMsg.contains("تفعيل")) {
+        rethrow; // نرسل الرسالة كما هي للواجهة
       }
 
-      // أي خطأ آخر غير الحظر وغير أخطاء الفايربيس، يظهر الرسالة العامة
-      throw "عذراً، حدث خطأ غير متوقع.";
+      // أي خطأ برمجي آخر (مثل خطأ في المودل) يظهر هنا
+      print("Login Error Detail: $e"); // عشان يظهر لك في الكونسول لو فيه مشكلة حقيقية
+      throw Exception("عذراً، حدث خطأ غير متوقع.");
     }
   }
-
   // --- 3. تسجيل مستخدم جديد ---
   Future<fb.User?> register({
     required String username,
@@ -260,4 +257,5 @@ class AuthenticationService {
       throw "عذراً، هذا الحساب محظور من قبل الإدارة.";
     }
   }
+
 }

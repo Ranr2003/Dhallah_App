@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../models/user_model.dart';
 
+
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -126,5 +127,8 @@ class DatabaseService {
     }
     return null;
   }
-
+// دالة تعيد Stream لمراقبة بيانات المستخدم لحظياً
+  Stream<dynamic> getUserStream(String uid) {
+    return _db.collection('users').doc(uid).snapshots();
+  }
 }

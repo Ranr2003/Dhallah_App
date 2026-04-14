@@ -77,66 +77,98 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      key: _scaffoldKey,
-      endDrawer: _buildSideMenu(context),
-      body: LoginSignupBackground(
-        child: Stack(
-          children: [
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    const SizedBox(height: 20),
-                    _buildTopBar(),
-                    const SizedBox(height: 30),
-                    Text("مرحباً $userName،", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF5A4A75), fontFamily: 'Cairo')),
-                    const Text("!جاهزين نساعدك بأي مفقود", style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500, fontFamily: 'Cairo')),
-                    const SizedBox(height: 35),
-                    _buildActionHeader(context),
-                    const SizedBox(height: 20),
-                    Expanded(
-                      child: (currentUid.isEmpty)
-                          ? const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)))
-                          : StreamBuilder<List<Report>>(
-                        // الآن الـ Stream ما يفتح إلا والـ ID جاهز
-                        stream: _itemService.getMyReportsStream(currentUid),
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)));
-                          }
+    // نستخدم dynamic هنا لتجنب استيراد مكتبة الفايربيس في هذا الملف
+    return StreamBuilder<dynamic>(
+        stream: _dbService.getUserStream(fb.FirebaseAuth.instance.currentUser?.uid ?? ""),
+        builder: (context, banSnapshot) {
 
-                          // إذا السناب شوت فيه خطأ (مثلاً مشكلة في الصلاحيات)
-                          if (snapshot.hasError) {
-                            return Center(child: Text("حدث خطأ في تحميل البيانات", style: TextStyle(fontFamily: 'Cairo')));
-                          }
+          if (banSnapshot.hasData && banSnapshot.data != null) {
+            // بما أن النوع dynamic، نصل للبيانات عبر الخاصية data()
+            // ونحولها لـ Map لنتعامل معها بسهولة
+            final data = banSnapshot.data.data();
+            if (data != null && data is Map<String, dynamic>) {
 
-                          if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                            return _buildEmptyState();
-                          }
+              // فحص حالة الحظر
+              if (data['isBanned'] == true) {
+                Future.microtask(() async {
+                  await _authService.logout();
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const LoginPage()),
+                            (route) => false
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("تم حظرك من قبل الإدارة"), backgroundColor: Colors.redAccent)
+                    );
+                  }
+                });
+                return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFB293CD))));
+              }
+            }
+          }
 
-                          final myReports = snapshot.data!;
-                          return ListView.builder(
-                            padding: const EdgeInsets.only(bottom: 100),
-                            itemCount: myReports.length,
-                            itemBuilder: (context, index) => _buildDismissibleReport(myReports[index]),
-                          );
-                        },
+          // 2. واجهة الصفحة الرئيسية (تعمل فقط إذا لم يكن محظوراً)
+          return Scaffold(
+            key: _scaffoldKey,
+            endDrawer: _buildSideMenu(context),
+            body: LoginSignupBackground(
+              child: Stack(
+                children: [
+                  SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          const SizedBox(height: 20),
+                          _buildTopBar(),
+                          const SizedBox(height: 30),
+                          Text("مرحباً $userName،",
+                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF5A4A75), fontFamily: 'Cairo')),
+                          const Text("!جاهزين نساعدك بأي مفقود",
+                              style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500, fontFamily: 'Cairo')),
+                          const SizedBox(height: 35),
+                          _buildActionHeader(context),
+                          const SizedBox(height: 20),
+                          Expanded(
+                            child: (currentUid.isEmpty)
+                                ? const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)))
+                                : StreamBuilder<List<Report>>(
+                              stream: _itemService.getMyReportsStream(currentUid),
+                              builder: (context, reportSnapshot) {
+                                if (reportSnapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)));
+                                }
+
+                                if (reportSnapshot.hasError) {
+                                  return const Center(child: Text("حدث خطأ في تحميل البيانات", style: TextStyle(fontFamily: 'Cairo')));
+                                }
+
+                                if (!reportSnapshot.hasData || reportSnapshot.data!.isEmpty) {
+                                  return _buildEmptyState();
+                                }
+
+                                final myReports = reportSnapshot.data!;
+                                return ListView.builder(
+                                  padding: const EdgeInsets.only(bottom: 100),
+                                  itemCount: myReports.length,
+                                  itemBuilder: (context, index) => _buildDismissibleReport(myReports[index]),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  _buildFloatingNavBar(context),
+                ],
               ),
             ),
-            _buildFloatingNavBar(context),
-          ],
-        ),
-      ),
-    );
+          );
+        } // إغلاق الـ builder الخاص بحارس الحظر
+    ); // إغلاق الـ StreamBuilder الخاص بحارس الحظر
   }
-
   // --- دوال بناء الواجهة (نفس ستايلك القديم تماماً) ---
 
   Widget _buildTopBar() {

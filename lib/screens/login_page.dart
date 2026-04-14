@@ -65,7 +65,37 @@ class _LoginPageState extends State<LoginPage> {
     _timer?.cancel();
     super.dispose();
   }
-
+  void _showBannedDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          title: const Row(
+            children: [
+              Icon(Icons.block_flipped, color: Colors.redAccent),
+              SizedBox(width: 10),
+              Text("تنبيه الحظر", style: TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            "نأسف، لقد تم حظر حسابك لمخالفة شروط الاستخدام. يرجى التواصل مع الإدارة للمزيد من التفاصيل.",
+            style: TextStyle(fontFamily: 'Cairo'),
+          ),
+          actions: [
+            WaterRippleButton(
+                text: "إغلاق",
+                onTap: () => Navigator.pop(context),
+                width: 100,
+                height: 40
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   // تحفظ طريقه الدخول
   Future<void> _saveLoginMethod(String method) async {
     final prefs = await SharedPreferences.getInstance();
@@ -80,14 +110,22 @@ class _LoginPageState extends State<LoginPage> {
     var userData = await _dbService.getUserById(user.uid);
 
     if (mounted && userData != null) {
-      // 2. التحقق أولاً: هل هو أدمن؟
+
+      // 🔥 فحص الحظر (باستخدام logout الموجودة في سيرفس رند)
+      // نتحقق من الحقل isBanned الموجود في مودل RegularUser
+      if (userData is RegularUser && userData.isBanned) {
+        await _authService.logout(); // ✅ هنا التعديل من signOut إلى logout
+        _showBannedDialog(context);   // إظهار نافذة الحظر
+        return;
+      }
+
+      // 2. التحقق من الأدمن
       if (userData.userType == 'admin') {
-        // إذا كان أدمن، ننشئ كائن الأدمن ونوجهه لصفحة الداش بورد
         Admin adminUser = Admin(
           userId: userData.userId,
           name: userData.name,
           email: userData.email,
-          adminLevel: (userData as dynamic).adminLevel ?? "General", // سحب الصلاحية
+          adminLevel: (userData as dynamic).adminLevel ?? "General",
         );
 
         Navigator.pushAndRemoveUntil(
@@ -95,10 +133,10 @@ class _LoginPageState extends State<LoginPage> {
           MaterialPageRoute(builder: (context) => AdminDashboard(admin: adminUser)),
               (route) => false,
         );
-        return; // ننهي الدالة هنا للأدمن
+        return;
       }
 
-      // 3. إذا لم يكن أدمن، نكمل الإجراءات المعتادة للمستخدم العادي
+      // 3. التحقق من اكتمال البروفايل للمستخدم العادي
       bool isComplete = await _dbService.checkProfileCompletion(user.uid);
       if (isComplete) {
         Navigator.pushAndRemoveUntil(
