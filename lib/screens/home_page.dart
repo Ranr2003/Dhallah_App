@@ -3,11 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart'; // مضاف بواسطة رند
+import '../models/notification_model.dart';
+import '../services/notification_serv.dart';
 import '../widgets/login_signup_background.dart';
 import 'lost_report_page.dart';
 import 'account_info_page.dart';
 import 'found_report_page.dart';
 import 'login_page.dart';
+import 'notifications_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -19,6 +22,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   String userName = "زائر";
+  bool _isSending = false;
 
   // تعريف الألوان كـ static لضمان وصول الدوال إليها بدون أخطاء undefined
   static const Color dustyPurple = Color(0xFF9681A8);
@@ -192,32 +196,78 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildTopBar() {
+    final String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Stack(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.notifications_none_rounded, size: 30, color: Color(0xFF5A4A75)),
-              onPressed: () {},
-            ),
-            Positioned(
-              right: 12, top: 12,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
-                constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
-              ),
-            )
-          ],
-        ),
+        StreamBuilder<List<NotificationModel>>(
+          stream: NotificationService().getNotifications(currentUserId),
+          builder: (context, snapshot) {
+            // فحص هل يوجد أي إشعار غير مقروء
+            bool hasUnread = false;
+            if (snapshot.hasData) {
+              hasUnread = snapshot.data!.any((n) => !n.isRead);
+            }
 
+            return Stack(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.notifications_none_rounded, size: 30),
+                  onPressed: () async {
+                    // 2. التحقق من حالة الإرسال لمنع التكرار
+                    if (_isSending) return;
+
+                    setState(() => _isSending = true);
+
+                    try {
+                      // 3. إرسال الإشعار التجريبي
+                      await NotificationService().sendNotification(
+                        receiverId: FirebaseAuth.instance.currentUser!.uid,
+                        title: "تنبيه سريع",
+                        body: "اختبار النقطة الحمراء",
+                        type: "test",
+                      );
+
+                      // 4. الانتقال لصفحة الإشعارات بعد نجاح الإرسال
+                      if (mounted) { // للتأكد أن الصفحة لا تزال موجودة
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const NotificationsPage()),
+                        );
+                      }
+                    } catch (e) {
+                      print("Error sending notification: $e");
+                    } finally {
+                      // 5. إعادة الحالة للسماح بالإرسال مرة أخرى لاحقاً
+                      if (mounted) {
+                        setState(() => _isSending = false);
+                      }
+                    }
+                  },
+                ),
+                // لا تظهر النقطة إلا إذا كان هناك إشعارات غير مقروءة
+                if (hasUnread)
+                  Positioned(
+                    right: 12,
+                    top: 12,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(6)),
+                      constraints: const BoxConstraints(minWidth: 8, minHeight: 8),
+                    ),
+                  )
+              ],
+            );
+          },
+        ),
         Image.asset('resourses/DallahAppLogo2.png', height: 45,
             errorBuilder: (context, error, stackTrace) => const Icon(Icons.apps)),
 
         IconButton(
           icon: const Icon(Icons.menu_rounded, size: 30, color: Color(0xFF5A4A75)),
-          onPressed: () {
+          onPressed: () async {
             _scaffoldKey.currentState?.openEndDrawer();
           },
         ),
@@ -567,7 +617,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 }
-
 // دالات وريم (Sheet)
 void _openReportSheet(BuildContext context) {
   showModalBottomSheet(
