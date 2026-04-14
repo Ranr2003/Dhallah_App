@@ -67,7 +67,7 @@ class RegularUser extends User {
       'email': email,
       'phone': phone,
       'isProfileComplete': isProfileComplete,
-      'isBanned': isBanned, // 4. نحفظ حالة الحظر أيضاً
+      'isBanned': isBanned,
       'provider': provider,
       'lastUpdate': FieldValue.serverTimestamp(),
       'userType': userType,
