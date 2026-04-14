@@ -3,10 +3,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
 // استيراد الشاشات
+import 'screens/messages_page.dart';
 import 'screens/start_page.dart';
 import 'screens/login_page.dart';
 import 'screens/signup_page.dart';
 import 'screens/home_page.dart';
+import 'screens/chat_list_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +41,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
         '/home': (context) => const HomePage(),
+        '/chatList': (context) => const ChatListPage(),
+        '/messages': (context) => const MessagesPage(receiverId: '', userName: '', chatRoomId: '',),
       },
     );
   }

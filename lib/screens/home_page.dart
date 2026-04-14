@@ -336,14 +336,30 @@ class _HomePageState extends State<HomePage> {
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
+          // السطر التالي هو المهم، يجب أن تبدأ القائمة بـ children: [
           children: [
-            const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFFB293CD), size: 26),
-            _buildActiveHomeIcon(),
             InkWell(
-              onTap: _navigateToProfile, // تم الربط بدالة رند
-              child: const Icon(Icons.person_outline_rounded, color: Color(0xFFB293CD), size: 28),
+              onTap: () {
+                Navigator.pushNamed(context, '/chatList');
+              },
+              child: const Icon(
+                Icons.chat_bubble_outline_rounded,
+                color: Color(0xFFB293CD),
+                size: 26,
+              ),
             ),
-          ],
+
+            _buildActiveHomeIcon(),
+
+            InkWell(
+              onTap: _navigateToProfile,
+              child: const Icon(
+                Icons.person_outline_rounded,
+                color: Color(0xFFB293CD),
+                size: 28,
+              ),
+            ),
+          ], // إغلاق قائمة الـ children
         ),
       ),
     );

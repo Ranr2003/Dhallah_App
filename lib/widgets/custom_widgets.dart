@@ -371,3 +371,258 @@ class GradientButton extends StatelessWidget {
     );
   }
 }
+// ══════════════════════════════════════════════
+// 10. Chat Avatar (صورة المستخدم الدائرية)
+// ══════════════════════════════════════════════
+
+class ChatAvatar extends StatelessWidget {
+  final String imageUrl;
+  const ChatAvatar({super.key, required this.imageUrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 2),
+      ),
+      child: CircleAvatar(
+        radius: 35,
+        backgroundColor: AppColors.fieldBg,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(35),
+          child: Image.network(
+            imageUrl,
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) =>
+            const Icon(Icons.person, color: AppColors.textHint, size: 35),
+          ),
+        ),
+      ),
+    );
+  }
+}
+// ══════════════════════════════════════════════
+// 11. Chat Message Bubble (فقاعة الرسالة)
+// ══════════════════════════════════════════════
+
+class ChatBubble extends StatelessWidget {
+  final String message;
+  final bool isSender;
+  final String time;
+
+  const ChatBubble({
+    super.key,
+    required this.message,
+    required this.isSender,
+    required this.time,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: isSender ? Alignment.centerLeft : Alignment.centerRight,
+      child: Column(
+        crossAxisAlignment: isSender ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              // لون الفقاعة: أزرق فاتح للمرسل، أبيض للمستقبل حسب التصميم
+              color: isSender ? const Color(0xFFCDE2FD) : AppColors.white,
+              borderRadius: BorderRadius.only(
+                topLeft: const Radius.circular(20),
+                topRight: const Radius.circular(20),
+                bottomLeft: Radius.circular(isSender ? 0 : 20),
+                bottomRight: Radius.circular(isSender ? 20 : 0),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 15,
+                fontFamily: 'Tajawal',
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 15),
+            child: Text(
+              time,
+              style: const TextStyle(fontSize: 10, color: AppColors.textHint, fontFamily: 'Tajawal'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+// ══════════════════════════════════════════════
+// 12. Chat Input Field (حقل إدخال الرسالة)
+// ══════════════════════════════════════════════
+
+class ChatInputField extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onSend;
+
+  const ChatInputField({
+    super.key,
+    required this.controller,
+    required this.onSend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            const Icon(Icons.mic_none_rounded, color: AppColors.textHint),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: AppColors.fieldBg,
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                child: TextField(
+                  controller: controller,
+                  textAlign: TextAlign.right,
+                  decoration: const InputDecoration(
+                    hintText: "اكتب رسالتك...",
+                    border: InputBorder.none,
+                    hintStyle: TextStyle(color: AppColors.textHint, fontSize: AppDimens.fontMd),
+                    filled: false,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Icon(Icons.attach_file, color: AppColors.textHint),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: onSend,
+              child: const CircleAvatar(
+                backgroundColor: AppColors.textPrimary,
+                radius: 20,
+                child: Icon(Icons.send, color: Colors.white, size: 18),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ══════════════════════════════════════════════
+// 13. Message Tile (قائمة الرسائل في الصفحة الرئيسية)
+// ══════════════════════════════════════════════
+
+class MessageTile extends StatelessWidget {
+  final String name;
+  final String message;
+  final String? count;
+  final VoidCallback onTap;
+
+  const MessageTile({
+    super.key,
+    required this.name,
+    required this.message,
+    required this.onTap,
+    this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector( // 3. غلفي الـ Container بـ GestureDetector
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            // عدد الرسائل غير المقروءة
+            if (count != null && count != "0")
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: AppColors.primary, // اللون البنفسجي
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  count!, // الرقم القادم من الفايربيس
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            const Spacer(),
+            // النصوص (الاسم والرسالة) بمحاذاة اليمين
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: AppDimens.fontXl,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  Text(
+                    message,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: AppDimens.fontMd,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 15),
+            // أيقونة المستخدم (شخص مع علامة استفهام كما في التصميم)
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.textPrimary.withOpacity(0.6), width: 1.5),
+              ),
+              child: const Icon(Icons.person_search_outlined, size: 28, color: AppColors.textPrimary),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
