@@ -23,6 +23,8 @@ import '../screens/signup_page.dart';
 import '../screens/ForgotPassword_page.dart';
 import '../screens/account_info_page.dart';
 import '../screens/home_page.dart';
+import '../models/user_model.dart';
+import 'admin_dashboard.dart';
 
 // ---------------------------------------------------------
 //  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
@@ -70,26 +72,48 @@ class _LoginPageState extends State<LoginPage> {
     await prefs.setString('loginMethod', method);
   }
 
-  // توجيه المستخدم بحسب حاله اكتمال الملف الشخصي
+// ---------------------------------------------------------
+// تعديل دالة توجيه المستخدم لتشمل فحص الأدمن
+// ---------------------------------------------------------
   void _redirectUser(fb.User user, String provider, String emailOrPhone) async {
-    bool isComplete = await _dbService.checkProfileCompletion(user.uid);
-    if (mounted) {
+    // 1. جلب بيانات المستخدم كاملة من الداتابيز
+    var userData = await _dbService.getUserById(user.uid);
+
+    if (mounted && userData != null) {
+      // 2. التحقق أولاً: هل هو أدمن؟
+      if (userData.userType == 'admin') {
+        // إذا كان أدمن، ننشئ كائن الأدمن ونوجهه لصفحة الداش بورد
+        Admin adminUser = Admin(
+          userId: userData.userId,
+          name: userData.name,
+          email: userData.email,
+          adminLevel: (userData as dynamic).adminLevel ?? "General", // سحب الصلاحية
+        );
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => AdminDashboard(admin: adminUser)),
+              (route) => false,
+        );
+        return; // ننهي الدالة هنا للأدمن
+      }
+
+      // 3. إذا لم يكن أدمن، نكمل الإجراءات المعتادة للمستخدم العادي
+      bool isComplete = await _dbService.checkProfileCompletion(user.uid);
       if (isComplete) {
-        // إذا الحساب مكتمل يروح للهوم مباشرة
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(builder: (context) => const HomePage()),
               (route) => false,
         );
       } else {
-        // إذا جديد أو غير مكتمل يروح لصفحة إكمال البيانات
         Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
             builder: (context) => ProfilePage(
               userEmail: emailOrPhone,
               loginProvider: provider,
-              canEditPassword: false, // كلمه السر ممنوع يعدله
+              canEditPassword: false,
             ),
           ),
               (route) => false,
