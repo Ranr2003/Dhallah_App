@@ -91,7 +91,7 @@ class _FoundReportPageState extends State<FoundReportPage> {
           const SizedBox(height: 10),
           Text(
             title,
-            style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 18),
+            style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 18),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -99,7 +99,7 @@ class _FoundReportPageState extends State<FoundReportPage> {
             child: Text(
               desc,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'Cairo', fontSize: 14),
+              style: const TextStyle(fontFamily: 'Tajawal', fontSize: 14),
             ),
           ),
           const SizedBox(height: 25),

@@ -91,7 +91,7 @@ class _LostReportPageState extends State<LostReportPage> {
           const SizedBox(height: 10),
           Text(
             title,
-            style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 18),
+            style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 18),
           ),
           const SizedBox(height: 8),
           Padding(
@@ -99,7 +99,7 @@ class _LostReportPageState extends State<LostReportPage> {
             child: Text(
               desc,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'Cairo', fontSize: 14),
+              style: const TextStyle(fontFamily: 'Tajawal', fontSize: 14),
             ),
           ),
           const SizedBox(height: 25),
@@ -158,7 +158,7 @@ class _LostReportPageState extends State<LostReportPage> {
         title: 'فشل النشر',
         desc: 'حدث خطأ: $e',
         iconData: Icons.cancel_outlined,
-        iconColor: Colors.red,
+        iconColor: AppColors.error,
       );
     } finally {
       if (mounted) setState(() => _isPublishing = false);
@@ -200,7 +200,7 @@ class _LostReportPageState extends State<LostReportPage> {
             Textfield(hint: 'مثال: خدش، ملصق، قطعة مكسورة...', controller: _featController),
             const SizedBox(height: 30),
             _isPublishing
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)))
+                ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                 : FormActionButtons(onPublish: _publishReport, onCancel: () => Navigator.pop(context)),
           ],
         ),

@@ -216,10 +216,41 @@ class AuthenticationService {
   bool validatePassword(String password) => password.length >= 6;
 
   Future<void> logout() async {
-    await _googleSignIn.signOut();
-    await _auth.signOut();
+    try {
+      // نضع خروج قوقل داخل try-catch منفصل لأنه أحياناً يعلق إذا لم يكن المستخدم داخلاً بقوقل أصلاً
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        print("Google SignOut Error: $e"); // تجاهل الخطأ واكمل
+      }
+
+      // الخروج الأساسي من فايربيس
+      await _auth.signOut();
+      print("User logged out successfully");
+    } catch (e) {
+      print("Logout Error: $e");
+      // حتى لو صار خطأ، نحاول نخرج من فايربيس كحل أخير
+      await _auth.signOut();
+    }
   }
   fb.User? getCurrentUser() {
     return _auth.currentUser;
   }
+  // 1. دالة لتغيير كلمة المرور (بدلاً من استدعائها مباشرة في الصفحة)
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      fb.User? user = _auth.currentUser;
+      if (user != null) {
+        await user.updatePassword(newPassword);
+      }
+    } catch (e) {
+      rethrow; // نترك التعامل مع الخطأ للصفحة لتعرض التنبيه المناسب
+    }
+  }
+
+  // 2. دالة لجلب رقم الجوال الحالي المخزن في فايربيس (للمقارنة)
+  String? get currentPhone => _auth.currentUser?.phoneNumber;
+
+  // 3. دالة لجلب البريد الإلكتروني الحالي
+  String? get currentEmail => _auth.currentUser?.email;
 }

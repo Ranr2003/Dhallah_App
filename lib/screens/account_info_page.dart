@@ -1,34 +1,27 @@
 // account_info_page.dart
-// Rand
+// Updated by Gemini for Rand - Dhallah Project
+
+import 'package:flutter/material.dart';
 
 // ---------------------------------------------------------
-// (أولا) استيراد المكتبات والباكجيز
-// ---------------------------------------------------------
-import 'package:firebase_auth/firebase_auth.dart' as fb;      // للمصادقة
-import 'package:flutter/material.dart';                 // لواجهات فلاتر
-import 'package:intl_phone_field/intl_phone_field.dart';// لحقل الهاتف الدولي العلم والمفتاح
-// ---------------------------------------------------------
-// (ثانيا) استيراد الصفحات الأخرى لإستخدامها
+// (ثانيا) استيراد الملفات الضرورية
 // ---------------------------------------------------------
 import '../models/user_model.dart';
-import '../widgets/login_signup_background.dart';       // للخلفية
-import '../widgets/custom_button1.dart';                //
-import '../widgets/custom_text_field.dart';
-import '../services/authentication_serv.dart';// تأكدي من استيراد ملف الخدمة
+import '../widgets/Wavy_Background.dart';
+import '../widgets/custom_widgets.dart'; // الويدجتس الموحدة
+import '../services/authentication_serv.dart';
 import '../services/database_serv.dart';
+import '../utils/app_theme.dart'; // الثيم الموحد
 import 'login_page.dart';
 import 'home_page.dart';
 
-// ---------------------------------------------------------
-//  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
-// ---------------------------------------------------------
 class ProfilePage extends StatefulWidget {
   final String userEmail;
   final String? initialPhoneNumber;
   final String? initialName;
   final String loginProvider;
-  final bool canEditPassword; // لتحديد ما اذا كان مسموحا بتعديل كلمه المرور أم لا
-// كونستركتور
+  final bool canEditPassword;
+
   const ProfilePage({
     super.key,
     required this.userEmail,
@@ -54,8 +47,8 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isLoading = true;
   bool _isSaving = false;
   String _verificationId = "";
+  List<String> _otpCode = ["", "", "", "", "", ""];
 
-  // تهيئه كل حقل بالبيانات الأوليه
   @override
   void initState() {
     super.initState();
@@ -66,10 +59,10 @@ class _ProfilePageState extends State<ProfilePage> {
     );
     _nameController.text = widget.initialName ?? "";
     _phoneController = TextEditingController(
-        text: widget.initialPhoneNumber?.replaceFirst('+966', '') ?? "" //يقص المفتاح
+        text: widget.initialPhoneNumber?.replaceFirst('+966', '') ?? ""
     );
     _fullPhoneNumber = widget.initialPhoneNumber ?? "";
-   //استدعيت خوارزميه الجلب من ملف الداتا بيس
+
     _dbService.loadUserData(
       nameController: _nameController,
       phoneController: _phoneController,
@@ -80,30 +73,26 @@ class _ProfilePageState extends State<ProfilePage> {
       updateState: setState,
     );
   }
-// ---------------------------------------------------------
-//  (رابعا) عمليات الحفظ والجلب والمنطق لها صله بملف الداتا بيس وملف المصادقه ويوزر مودل
-// ---------------------------------------------------------
 
-  // الحفظ النهائي في الفاير ستور
   Future<void> _finalSave() async {
     setState(() => _isSaving = true);
     try {
-      fb.User? currentUser = fb.FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      // التعديل 1: بدلاً من استدعاء Firebase مباشرة، نستخدم الدالة الجاهزة عندك في السيرفس
+      final String currentUid = _authService.currentUserId;
+      if (currentUid == 'unknown') return;
 
-      // 1. في حال كان المستخدم طالب تغيير الكلمه وسامحين له نحفظها هنا بشكل نهائي في المصادقه
       if (widget.canEditPassword && _passController.text.trim().isNotEmpty) {
         if (_passController.text.trim().length < 6) {
           _showError("كلمة المرور يجب أن تكون 6 خانات على الأقل");
           return;
         }
-        await currentUser.updatePassword(_passController.text.trim());
-        debugPrint("تم تحديث كلمة المرور في Auth بنجاح"); //رساله تطلع لي انا
+        // التعديل 2: نستخدم الدالة التي أضفناها للسيرفس لتغيير الباسوورد
+        await _authService.updatePassword(_passController.text.trim());
       }
 
-      // 2.تحديث البيانات وحفظها في الفاير ستور
+      // المنطق كما هو دون تغيير
       final updatedUser = RegularUser(
-        userId: currentUser.uid,
+        userId: currentUid,
         name: _nameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _fullPhoneNumber.trim(),
@@ -111,14 +100,13 @@ class _ProfilePageState extends State<ProfilePage> {
         provider: widget.loginProvider,
       );
 
-      await _dbService.saveProfile(updatedUser); // استدعاء دالة الحفظ
+      await _dbService.saveProfile(updatedUser);
 
-       // 3. رساله النجاح ثم الانتظار قليلا وبعدها التوجه تلقائيا للهوم
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text("تم تحديث البيانات وكلمة المرور بنجاح "),
-              backgroundColor: Colors.green
+              content: Text("تم تحديث البيانات بنجاح"),
+              backgroundColor: AppColors.success
           ),
         );
         Future.delayed(const Duration(seconds: 1), () {
@@ -131,61 +119,48 @@ class _ProfilePageState extends State<ProfilePage> {
           }
         });
       }
-      // هنا في حطيت أبرز رسائل الخطأ من المصادقه بالفير بيس وخليتها بالعربي حتى تكون مفهومه اكثر
-    } on fb.FirebaseAuthException catch (e) {
-      if (e.code == 'requires-recent-login') {
-        _showError("لأمانك، يرجى تسجيل الخروج والدخول مجدداً لتغيير كلمة السر");
-      } else {
-        _showError("خطأ في تغيير كلمة السر: ${e.message}");
-      }
-      // هنا لو صار خطأ في عمليه الحفظ النهائي
     } catch (e) {
-      _showError("حدث خطأ غير متوقع: $e");
+      // هنا اختصرنا التعامل مع الخطأ لأن السيرفس سترسل رسالة الخطأ جاهزة
+      _showError(e.toString().contains('requires-recent-login')
+          ? "لأمانك، يرجى تسجيل الخروج والدخول مجدداً لتغيير كلمة السر"
+          : "حدث خطأ: $e");
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
   }
 
-  // الحفظ مع التدقيق على المعلومات المدخلة وصلاحيتها قبل الإعتماد في الفاير ستور
   Future<void> _onSavePressed() async {
     final String enteredEmail = _emailController.text.trim();
     final String enteredName = _nameController.text.trim();
 
-    // 1. نتأكد انه مافي شيئ فاضي
     if (enteredName.isEmpty || _fullPhoneNumber.trim().isEmpty) {
-      _showError("الرجاء إدخال الاسم ورقم الجوال أولاً"); // اذا فيه فراغ خله يرجع يعبي
+      _showError("الرجاء إدخال الاسم ورقم الجوال أولاً");
       return;
     }
     setState(() => _isSaving = true);
 
     try {
-      fb.User? currentUser = fb.FirebaseAuth.instance.currentUser;
-      if (currentUser == null) return;
+      final String currentUid = _authService.currentUserId;
+      if (currentUid == 'unknown') return;
 
-      // 2. لما دخلت بالجوال --> نتأكد انه الايميل ماقد استخدم
       if (widget.loginProvider == 'phone' && enteredEmail.isNotEmpty) {
-        bool isTaken = await _dbService.isFieldTaken('email', enteredEmail, currentUser.uid);
-
+        bool isTaken = await _dbService.isFieldTaken('email', enteredEmail, currentUid);
         if (isTaken) {
-          _showError("عذراً، هذا البريد الإلكتروني مسجل بالفعل بحساب آخر!");
+          _showError("عذراً، هذا البريد الإلكتروني مسجل بالفعل!");
           return;
         }
       }
 
-      // حفظت قيمه تعلمني لو رقم الجوال تغير أو لا
-      bool isPhoneChanged = _fullPhoneNumber.trim() != (currentUser.phoneNumber ?? "");
+      bool isPhoneChanged = _fullPhoneNumber.trim() != (_authService.currentPhone ?? "");
 
-      // 3. لما دخلت بالإيميل --> نتأكد انه الرقم ماقد استخدم
       if (widget.loginProvider != 'phone' && isPhoneChanged) {
-        bool isTaken = await _dbService.isFieldTaken('phone', _fullPhoneNumber.trim(), currentUser.uid);
-
+        bool isTaken = await _dbService.isFieldTaken('phone', _fullPhoneNumber.trim(), currentUid);
         if (isTaken) {
-          _showError("عذراً، رقم الجوال هذا مرتبط بحساب آخر بالفعل!");
+          _showError("عذراً، رقم الجوال هذا مرتبط بحساب آخر!");
           return;
         }
         _startPhoneVerification();
       } else {
-        // 4. الحفظ النهائي إذا كان كل شيء تمام
         await _finalSave();
       }
     } catch (e) {
@@ -195,11 +170,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-// ---------------------------------------------------------
-//  (خامسا) التحقق وصفحاته
-// ---------------------------------------------------------
-
-  // داله ارسال الكود عشان عمليه ربط الجوال .1
   void _startPhoneVerification() async {
     setState(() => _isSaving = true);
     await _authService.verifyPhoneNumber(
@@ -218,93 +188,63 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // تصميم شكل نافذه ارخال كود التجقق .2
   void _showOtpDialog() {
-    // صممت ليست به 6 اماكن لان كود التحقق يتكون منها
-    final List<TextEditingController> otpControllers = List.generate(6, (index) => TextEditingController());
-    // تصميم شكل الشيت اللي راح تظهر من الاسفل
+    _otpCode = ["", "", "", "", "", ""];
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      // نحسب حساب انه النافذه بالاسفل فممكن احتاج مساحه اكبر عشان اكتب الكود لو طلعت لوحه المفاتيح
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // خط علوي للديكور
-              Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
-              const SizedBox(height: 25),
-              const Text("تحقق من الرقم لربط الحساب",
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
-              const SizedBox(height: 10),
-              Text("أدخل الرمز المرسل إلى $_fullPhoneNumber",
-                  style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
-              const SizedBox(height: 30),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(AppDimens.radiusSheet)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 50, height: 5, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10))),
+                const SizedBox(height: 25),
+                const Text("تحقق من الرقم لربط الحساب",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                const SizedBox(height: 10),
+                Text("أدخل الرمز المرسل إلى $_fullPhoneNumber",
+                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary), textAlign: TextAlign.center),
+                const SizedBox(height: 30),
 
-              // تصميم شكل الست بوكسات اللي فيها بندخل الارقام
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(6, (index) => SizedBox(
-                  width: 45,
-                  child: TextField(
-                    // سويت متغير عشان اخذ من اللست رقم لحال
-                    controller: otpControllers[index],
-                    autofocus: index == 0,
-                    textAlign: TextAlign.center,
-                    keyboardType: TextInputType.number,
-                    maxLength: 1,
-                    // الخط ولونه داخل البوكس
-                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF673AB7)),
-                    decoration: InputDecoration(
-                      counterText: "",
-                      fillColor: const Color(0xFFFBF9FF),
-                      filled: true,
-                      enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFFEEEEEE))
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: Color(0xFF673AB7), width: 2)
-                      ),
-                    ),
-                    onChanged: (value) {
-                      // نمشي للي بعده اذا دخلت رقم
-                      if (value.length == 1 && index < 5) FocusScope.of(context).nextFocus();
-                      // نرجع للي قبله اذا حذفت رقم
-                      if (value.isEmpty && index > 0) FocusScope.of(context).previousFocus();
-                    },
-                  ),
-                )),
-              ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(6, (index) => CustomOTPField(
+                    index: index,
+                    otpCode: _otpCode,
+                    isError: false,
+                    onChanged: () => setSheetState(() {}),
+                  )),
+                ),
 
-              const SizedBox(height: 35),
+                const SizedBox(height: 35),
 
-              WaterRippleButton(
-                text: "تأكيد وربط الحساب",
-                onTap: () async {
-                  String smsCode = otpControllers.map((e) => e.text).join(); //جمعت الارقام من كل بوكس
-                  try {
-                    await _authService.linkPhoneNumber(_verificationId, smsCode); //ارسلنا الكود للفاير بيس عشان تربط الرقم
-                    if (mounted) Navigator.pop(context); // نسكر الشيت
-                    await _finalSave();
-                  } catch (e) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("كود التحقق غير صحيح")));
-                  }
-                },
-                width: double.infinity,
-                height: 55,
-              ),
-              const SizedBox(height: 15),
-            ],
+                WaterRippleButton(
+                  text: "تأكيد وربط الحساب",
+                  onTap: () async {
+                    String smsCode = _otpCode.join();
+                    try {
+                      await _authService.linkPhoneNumber(_verificationId, smsCode);
+                      if (mounted) Navigator.pop(context);
+                      await _finalSave();
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("كود التحقق غير صحيح")));
+                    }
+                  },
+                  width: double.infinity,
+                  height: 55,
+                ),
+                const SizedBox(height: 15),
+              ],
+            ),
           ),
         ),
       ),
@@ -314,13 +254,12 @@ class _ProfilePageState extends State<ProfilePage> {
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.redAccent),
+        SnackBar(content: Text(message), backgroundColor: AppColors.error),
       );
       setState(() => _isSaving = false);
     }
   }
 
-// داله للتنظيف حتى لا تستهلك الذاكره
   @override
   void dispose() {
     _emailController.dispose();
@@ -329,129 +268,126 @@ class _ProfilePageState extends State<ProfilePage> {
     _passController.dispose();
     super.dispose();
   }
-// ---------------------------------------------------------
-//  (سادسا) التصميم وشكل الصفحه
-// ---------------------------------------------------------
+
   @override
   Widget build(BuildContext context) {
-    // تعريف حالات القفل بناءً على طريقة الدخول
-    bool isEmailLocked = widget.loginProvider == 'email' || widget.loginProvider == 'google';
-    bool isPhoneLocked = widget.loginProvider == 'phone';
-    //شكل صفحه الملف الشخصي
+    String provider = widget.loginProvider.toLowerCase().trim();
+
+    // "حزام أمان" إضافي: لو القيمة فاضية، نبحث عنها في الـ SharedPreferences داخل الـ build (اختياري)
+    // لكن الاعتماد على ما يرسله الناف بار بعد تعديله كافي.
+
+    bool isEmailLocked = provider == 'email' || provider == 'google' || provider == 'password';
+    bool isPhoneLocked = provider == 'phone';
+
+    print("Final Check - Provider: $provider | EmailLocked: $isEmailLocked | PhoneLocked: $isPhoneLocked");
     return Scaffold(
       extendBodyBehindAppBar: true,
+      // نصيحة: بما أننا أضفنا ناف بار، يفضل حذف زر الرجوع من الـ AppBar
+      // لأن التنقل سيكون عبر الناف بار، أو إبقاؤه حسب رغبتك.
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        // سهم لما نضغطه يوجهني للهوم
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF5A4A75)),
-          onPressed: () => Navigator.pushAndRemoveUntil(
-              context, MaterialPageRoute(builder: (context) => const HomePage()), (route) => false),
-        ),
+        automaticallyImplyLeading: false, // حذف سهم الرجوع الافتراضي لتجنب الازدحام
       ),
-      body: LoginSignupBackground(
-        child: Center(
-          child: _isLoading
-              ? const CircularProgressIndicator(color: Color(0xFF5A4A75))
-              : SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 80),
-            child: Column(
-              children: [
-                const Text("الملف الشخصي",
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF5A4A75))),
-                const SizedBox(height: 40),
+      body: WavyBackground(
+        child: Stack( // أضفنا Stack هنا
+          children: [
+            Center(
+              child: _isLoading
+                  ? const CircularProgressIndicator(color: AppColors.primary)
+                  : SingleChildScrollView(
+                // أضفنا padding سفلية (100) عشان المحتوى ما يختفي تحت الناف بار
+                padding: const EdgeInsets.fromLTRB(AppDimens.paddingH, 80, AppDimens.paddingH, 120),
+                child: Column(
+                  children: [
+                    const Text("الملف الشخصي",
+                        style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primaryDark, fontFamily: 'Tajawal')),
+                    const SizedBox(height: 40),
 
-                CustomInputField(
-                  label: "الاسم الكامل",
-                  hintText: "أدخل اسمك هنا",
-                  controller: _nameController,
-                  fillColor: Colors.white.withOpacity(0.7),
-                ),
-                const SizedBox(height: 15),
-
-                CustomInputField(
-                  label: "البريد الإلكتروني",
-                  hintText: "example@mail.com",
-                  controller: _emailController,
-                  readOnly: isEmailLocked, //نقفله اذا داخلين بالايميل او قوقل
-                  fillColor: isEmailLocked ? Colors.grey.withOpacity(0.2) : Colors.white.withOpacity(0.7),
-                ),
-                const SizedBox(height: 15),
-
-                // عشان رقم الجوال له نوع فيلد غير فاحتجنا نسوي الليبل بشكل منفصل وننسقه
-                const Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: EdgeInsets.only(right: 8, bottom: 8),
-                    child: Text("رقم الهاتف",
-                        style: TextStyle(color: Color(0xFF5A4A75), fontWeight: FontWeight.bold, fontSize: 14)),
-                  ),
-                ),
-                AbsorbPointer(
-                  absorbing: isPhoneLocked,
-                  child: IntlPhoneField(
-                    controller: _phoneController,
-                    disableLengthCheck: true,
-                    textAlign: TextAlign.left,
-                    decoration: InputDecoration(
-                      hintText: '5xxxxxxx',
-                      fillColor: isPhoneLocked
-                          ? Colors.grey.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.7),
-                      filled: true,
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(15),
-                          borderSide: BorderSide.none),
+                    CustomInputField(
+                      label: "الاسم الكامل",
+                      hintText: "أدخل اسمك هنا",
+                      controller: _nameController,
+                      fillColor: AppColors.white.withOpacity(0.7),
                     ),
-                    initialCountryCode: 'SA',
-                    onChanged: (phone) => _fullPhoneNumber = phone.completeNumber,
-                  ),
+                    const SizedBox(height: 15),
+
+                    CustomInputField(
+                      label: "البريد الإلكتروني",
+                      hintText: "example@mail.com",
+                      controller: _emailController,
+                      readOnly: isEmailLocked,
+                      fillColor: isEmailLocked ? AppColors.secondary.withOpacity(0.3) : AppColors.white.withOpacity(0.7),
+                    ),
+                    const SizedBox(height: 15),
+
+                    const Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: EdgeInsets.only(right: 8, bottom: 8),
+                        child: Text("رقم الجوال",
+                            style: TextStyle(fontWeight: FontWeight.bold,
+                              fontFamily: 'Tajawal',
+                              fontSize: AppDimens.fontLg,
+                              color: AppColors.textPrimary,)),
+                      ),
+                    ),
+                    CustomPhoneField(
+                      controller: _phoneController,
+                      readOnly: isPhoneLocked,
+                      onChanged: (fullNumber) => _fullPhoneNumber = fullNumber,
+                    ),
+                    const SizedBox(height: 15),
+
+                    CustomInputField(
+                      label: "كلمة السر الجديدة",
+                      hintText: widget.canEditPassword
+                          ? "أدخل كلمة السر الجديدة"
+                          : "التعديل متاح عبر الاستعادة فقط",
+                      controller: _passController,
+                      isPass: true,
+                      readOnly: !widget.canEditPassword,
+                      fillColor: widget.canEditPassword ? AppColors.white.withOpacity(0.7) : AppColors.secondary.withOpacity(0.3),
+                    ),
+
+                    const SizedBox(height: 35),
+
+                    WaterRippleButton(
+                        text: _isSaving ? "جاري الحفظ..." : "حفظ التعديلات",
+                        width: 200,
+                        height: 50,
+                        onTap: _isSaving ? () {} : _onSavePressed
+                    ),
+
+                    const SizedBox(height: 30),
+                    _buildProviderStatus(),
+
+                    TextButton.icon(
+                      onPressed: () async {
+                        await _authService.logout();
+                        if (mounted) {
+                          Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
+                        }
+                      },
+                      icon: const Icon(Icons.logout, color: AppColors.error),
+                      label: const Text("تسجيل الخروج", style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 15),
-
-                CustomInputField(
-                  label: "كلمة السر الجديدة",
-                  hintText: widget.canEditPassword
-                      ? "أدخل كلمة السر الجديدة"
-                      : "التعديل متاح عبر الاستعادة فقط",
-                  controller: _passController,
-                  isPass: true,
-                  readOnly: !widget.canEditPassword,
-                  fillColor: widget.canEditPassword ? Colors.white.withOpacity(0.7) : Colors.grey.withOpacity(0.2),
-                ),
-
-                const SizedBox(height: 35),
-
-                WaterRippleButton(
-                    text: _isSaving ? "جاري الحفظ..." : "حفظ التعديلات",
-                    width: 200,
-                    height: 50,
-                    onTap: _isSaving ? () {} : _onSavePressed
-                ),
-
-                const SizedBox(height: 30),
-                _buildProviderStatus(),
-
-                TextButton.icon(
-                  onPressed: () async {
-                    await fb.FirebaseAuth.instance.signOut();
-                    if (mounted) {
-                      //لما اطلع يودين لصفحه الدخول
-                      Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (context) => const LoginPage()), (route) => false);
-                    }
-                  },
-                  icon: const Icon(Icons.logout, color: Colors.redAccent),
-                  label: const Text("تسجيل الخروج", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
-                ),
-              ],
+              ),
             ),
-          ),
+
+            // إستدعاء الناف بار الموحد
+            // استدعاء الودجت الموحد الجديد في الهوم
+            CustomFloatingNavBar(
+              currentIndex: 2, // رقم 1 يمثل الهوم
+            ),
+          ],
         ),
       ),
     );
   }
-  //لاظهار طريقه الدخول المستخدمه
+
   Widget _buildProviderStatus() {
     IconData icon;
     String providerName;
@@ -470,9 +406,9 @@ class _ProfilePageState extends State<ProfilePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, color: const Color(0xFF5A4A75), size: 20),
+        Icon(icon, color: AppColors.primaryDark, size: 20),
         const SizedBox(width: 8),
-        Text("طريقة الدخول: $providerName", style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        Text("طريقة الدخول: $providerName", style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
       ],
     );
   }

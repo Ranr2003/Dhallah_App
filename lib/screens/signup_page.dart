@@ -4,16 +4,18 @@
 // ---------------------------------------------------------
 // (أولا) استيراد المكتبات والباكجيز
 // ---------------------------------------------------------
+import 'package:dhallah_app/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 // ---------------------------------------------------------
 // (ثانيا) استيراد الصفحات الأخرى لإستخدامها
 // ---------------------------------------------------------
 import '../services/authentication_serv.dart';
 import '../screens/login_page.dart';
-import '../widgets/login_signup_background.dart';
-import '../widgets/custom_button1.dart';
-import '../Widgets/custom_text_field.dart';
-import '../widgets/custom_text_link.dart';
+import '../widgets/Wavy_Background.dart';
+//import '../widgets/custom_button1.dart';
+//import '../Widgets/custom_text_field.dart';
+//import '../widgets/custom_text_link.dart';
+import '../widgets/custom_widgets.dart';
 
 // ---------------------------------------------------------
 //  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
@@ -34,6 +36,7 @@ class _SignUpPageState extends State<SignUpPage> {
   final AuthenticationService _authService = AuthenticationService();
 
   bool _isLoading = false;
+
 // ---------------------------------------------------------
 //  (رابعا) بعض الدوال المهمه مثل تنظيف و
 // ---------------------------------------------------------
@@ -57,7 +60,9 @@ class _SignUpPageState extends State<SignUpPage> {
       );
       return;
     }
-    setState(() { _isLoading = true; });
+    setState(() {
+      _isLoading = true;
+    });
     try {
       final user = await _authService.register(
         username: _usernameController.text.trim(),
@@ -69,8 +74,9 @@ class _SignUpPageState extends State<SignUpPage> {
       if (user != null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text("تم إنشاء الحساب! تفقد بريدك الإلكتروني لتفعيل الحساب."),
-            backgroundColor: Colors.green,
+            content: Text(
+                "تم إنشاء الحساب! تفقد بريدك الإلكتروني لتفعيل الحساب."),
+            backgroundColor: AppColors.success,
             duration: Duration(seconds: 4),
           ),
         );
@@ -85,33 +91,46 @@ class _SignUpPageState extends State<SignUpPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString().replaceAll("Exception:", "")),
-            backgroundColor: Colors.redAccent,
+            backgroundColor: AppColors.error,
           ),
         );
       }
     } finally {
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
       }
     }
   }
+
 // ---------------------------------------------------------
 //  (خامسا) البناء للصفحه
 // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    return LoginSignupBackground(
+    return WavyBackground( // الاسم الجديد والجميل
       child: Center(
         child: SingleChildScrollView(
           child: Container(
-            width: MediaQuery.of(context).size.width > 600 ? 400 : MediaQuery.of(context).size.width * 0.85,
-            padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
+            // استجابة الشاشة (Responsive width)
+            width: MediaQuery
+                .of(context)
+                .size
+                .width > 600 ? 400 : MediaQuery
+                .of(context)
+                .size
+                .width * 0.85,
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppDimens.paddingH, vertical: 30),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(35),
+              color: AppColors.white,
+              // توحيد اللون
+              borderRadius: BorderRadius.circular(AppDimens.radiusSheet),
+              // توحيد الانحناء
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFD2B4EC).withOpacity(0.15),
+                  color: AppColors.shadowColor.withOpacity(0.15), // توحيد الظل
                   blurRadius: 30,
                   offset: const Offset(0, 10),
                 ),
@@ -120,47 +139,69 @@ class _SignUpPageState extends State<SignUpPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Image.asset('resourses/DallahAppLogo2.png', height: 70, fit: BoxFit.contain),
-                const SizedBox(height: 10),
+                // الشعار
+                Image.asset('resourses/DallahAppLogo2.png', height: 70,
+                    fit: BoxFit.contain),
+                const SizedBox(height: AppDimens.spaceSm),
+
                 const Text(
                   "تسجيل الحساب",
-                  style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                  style: TextStyle(
+                      fontSize: AppDimens.fontAppBar,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Tajawal'
+                  ),
                 ),
                 const Text(
                   "سجل معلوماتك ونكمل مشوارنا",
-                  style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      fontSize: AppDimens.fontMd,
+                      color: AppColors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                      fontFamily: 'Tajawal'
+                  ),
                 ),
-                const SizedBox(height: 25),
+                const SizedBox(height: AppDimens.spaceLg),
 
+                // الحقول النصية باستخدام ألوان الثيم
                 CustomInputField(
                   label: "الاسم الكامل",
                   hintText: "أدخل اسمك الثلاثي",
                   controller: _usernameController,
+                  fillColor: AppColors.fieldBg, // توحيد خلفية الحقل
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: AppDimens.spaceMd),
+
                 CustomInputField(
                   label: "البريد الإلكتروني",
                   hintText: "example@mail.com",
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
+                  fillColor: AppColors.fieldBg,
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: AppDimens.spaceMd),
+
                 CustomInputField(
                   label: "كلمة السر",
                   hintText: "أدخل كلمة السر",
                   controller: _passwordController,
                   isPass: true,
+                  fillColor: AppColors.fieldBg,
                 ),
-                const SizedBox(height: 15),
+                const SizedBox(height: AppDimens.spaceMd),
+
                 CustomInputField(
                   label: "تأكيد كلمة السر",
                   hintText: "أعد كتابة كلمة السر",
                   controller: _confirmPasswordController,
                   isPass: true,
+                  fillColor: AppColors.fieldBg,
                 ),
 
-                const SizedBox(height: 25),
+                const SizedBox(height: AppDimens.spaceLg),
 
+                // الزر الأساسي
                 WaterRippleButton(
                   text: "قم بالتسجيل",
                   onTap: _handleSignUp,
@@ -169,6 +210,7 @@ class _SignUpPageState extends State<SignUpPage> {
 
                 const SizedBox(height: 20),
 
+                // رابط العودة لتسجيل الدخول
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -176,7 +218,11 @@ class _SignUpPageState extends State<SignUpPage> {
                       text: "  قم بتسجيل الدخول  ",
                       onTap: () => Navigator.pop(context),
                     ),
-                    const Text("لديك حساب بالفعل؟ ", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                    const Text(
+                        "لديك حساب بالفعل؟ ",
+                        style: TextStyle(color: AppColors.textSecondary,
+                            fontSize: AppDimens.fontMd)
+                    ),
                   ],
                 ),
               ],

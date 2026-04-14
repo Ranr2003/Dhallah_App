@@ -4,6 +4,7 @@
 // (أولا) استيراد المكتبوات والباكجيز
 // ---------------------------------------------------------
 import 'dart:async';
+import 'package:dhallah_app/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -15,10 +16,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 // ---------------------------------------------------------
 import '../services/authentication_serv.dart';
 import '../services/database_serv.dart';
-import '../widgets/login_signup_background.dart';
-import '../widgets/custom_button1.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/custom_text_link.dart';
+import '../widgets/Wavy_Background.dart';
+//import '../widgets/custom_button1.dart';
+import '../widgets/custom_widgets.dart';
+//import '../widgets/custom_text_field.dart';
+//import '../widgets/custom_text_link.dart';
 import '../screens/signup_page.dart';
 import '../screens/ForgotPassword_page.dart';
 import '../screens/account_info_page.dart';
@@ -147,40 +149,40 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 20),
 
                   if (!isCodeSent) ...[
-                    const Text("تسجيل الدخول بالجوال", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                    const Text("تسجيل الدخول بالجوال", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkgray)),
                     const SizedBox(height: 10),
                     const Text("أدخل رقم جوالك لتصلك رسالة التأكيد", style: TextStyle(fontSize: 13, color: Colors.grey)),
                     const SizedBox(height: 30),
-                    IntlPhoneField(
-                      disableLengthCheck: true,
-                      decoration: InputDecoration(
-                        labelText: 'رقم الجوال',
-                        hintText: '5xxxxxxx',
-                        fillColor: const Color(0xFFFBF9FF),
-                        filled: true,
-                        errorText: _phoneError,
-                        errorStyle: const TextStyle(fontSize: 10, height: 0.8),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
-                      ),
-                      initialCountryCode: 'SA',
-                      onChanged: (phone) {
-                        _phoneNumber = phone.number;
-                        _fullPhoneNumber = phone.completeNumber;
+                    CustomPhoneField(
+                      errorText: _phoneError,
+                      onChanged: (fullNumber) {
+                        // هنا نحدث القيمتين لضمان استمرار عمل الـ Logic القديم
+                        _fullPhoneNumber = fullNumber;
+                        _phoneNumber = fullNumber.replaceFirst('+966', '');
                         if(_phoneError != null) setSheetState(() => _phoneError = null);
                       },
                     ),
                   ] else ...[
-                    const Text("رمز التحقق", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                    const Text("رمز التحقق", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkgray)),
                     const SizedBox(height: 10),
                     Text("أدخل الرمز المرسل إلى $_fullPhoneNumber", style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
                     const SizedBox(height: 30),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: List.generate(6, (index) => _buildOTPBox(context, index, setSheetState)),
+                      children: List.generate(6, (index) => CustomOTPField(
+                        index: index,
+                        otpCode: _otpCode,
+                        isError: _isOtpError,
+                        onChanged: () { // احذفي كلمة value من هنا
+                          setSheetState(() {
+                            _isOtpError = false;
+                          });
+                        },
+                      ),),
                     ),
                     if (_isOtpError) ...[
                       const SizedBox(height: 12),
-                      const Text("رمز التحقق غير صحيح، حاول مرة أخرى", style: TextStyle(color: Colors.redAccent, fontSize: 11)),
+                      const Text("رمز التحقق غير صحيح، حاول مرة أخرى", style: TextStyle(color: AppColors.error, fontSize: 11)),
                     ],
                     const SizedBox(height: 20),
                     _isTimerActive
@@ -246,33 +248,6 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
-
-  Widget _buildOTPBox(BuildContext context, int index, StateSetter setSheetState) {
-    return SizedBox(
-      width: 45,
-      child: TextField(
-        autofocus: index == 0,
-        textAlign: TextAlign.center,
-        keyboardType: TextInputType.number,
-        maxLength: 1,
-        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF673AB7)),
-        decoration: InputDecoration(
-          counterText: "",
-          fillColor: const Color(0xFFFBF9FF),
-          filled: true,
-          // لو خطأ يحط الحدود بالاحمر
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFFEEEEEE))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFF673AB7), width: 2)),
-        ),
-        onChanged: (value) {
-          setSheetState(() { _otpCode[index] = value; _isOtpError = false; });
-          if (value.length == 1 && index < 5) FocusScope.of(context).nextFocus();
-          if (value.isEmpty && index > 0) FocusScope.of(context).previousFocus();
-        },
-      ),
-    );
-  }
-
   void _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")));
@@ -287,7 +262,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: Colors.redAccent));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: AppColors.error));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -303,7 +278,7 @@ class _LoginPageState extends State<LoginPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.auto_awesome_rounded, color: Color(0xFFB293CD), size: 60),
+            const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 60),
             const SizedBox(height: 20),
             const Text("! قريبًا", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
             const SizedBox(height: 15),
@@ -318,7 +293,7 @@ class _LoginPageState extends State<LoginPage> {
 // الشكل للصفحه
   @override
   Widget build(BuildContext context) {
-    return LoginSignupBackground(
+    return WavyBackground(
       child: Center(
         child: SingleChildScrollView(
           child: Container(
@@ -327,20 +302,20 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(35),
-              boxShadow: [BoxShadow(color: const Color(0xFFD2B4EC).withOpacity(0.15), blurRadius: 30, offset: const Offset(0, 10))],
+              boxShadow: [BoxShadow(color:AppColors.purble.withOpacity(0.15), blurRadius: 30, offset: const Offset(0, 10))],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset('resourses/DallahAppLogo2.png', height: 80),
                 const SizedBox(height: 15),
-                const Text("تسجيل الدخول", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                const Text("تسجيل الدخول", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color:AppColors.darkgray)),
                 const Text("! هلابك من جديد ", style: TextStyle(fontSize: 14, color: Colors.grey)),
                 const SizedBox(height: 30),
 
-                CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك الإلكتروني", controller: _emailController, fillColor: const Color(0xFFFBF9FF)),
+                CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك الإلكتروني", controller: _emailController, fillColor: AppColors.fieldBg ),
                 const SizedBox(height: 18),
-                CustomInputField(label: "كلمة السر", hintText: "أدخل كلمة السر", controller: _passwordController, isPass: true, fillColor: const Color(0xFFFBF9FF)),
+                CustomInputField(label: "كلمة السر", hintText: "أدخل كلمة السر", controller: _passwordController, isPass: true, fillColor: AppColors.fieldBg ),
 
                 const SizedBox(height: 30),
                 WaterRippleButton(text: "دخول", onTap: _handleLogin, isLoading: _isLoading, width: double.infinity, height: 55),
@@ -356,7 +331,7 @@ class _LoginPageState extends State<LoginPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildSocialIcon(FontAwesomeIcons.apple, Colors.black, "أبل", () => _showComingSoonDialog(context, "أبل")),
+                    _buildSocialIcon(FontAwesomeIcons.apple,Colors.black, "أبل", () => _showComingSoonDialog(context, "أبل")),
                     _buildSocialIcon(FontAwesomeIcons.microsoft, const Color(0xFF00A4EF), "مايكروسوفت", () => _showComingSoonDialog(context, "مايكروسوفت")),
                     _buildSocialIcon(FontAwesomeIcons.google, const Color(0xFFDB4437), "قوقل", () async {
                       setState(() => _isLoading = true);
