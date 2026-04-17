@@ -10,12 +10,8 @@ import 'package:intl_phone_field/intl_phone_field.dart';
 import '../screens/home_page.dart';
 import '../screens/account_info_page.dart'; // تأكدي من المسار الصحيح لصفحة الملف
 
-
-// ══════════════════════════════════════════════
+// FOUND & LOST REPORTS PAGE
 // 1. Page Header
-// ══════════════════════════════════════════════
-
-// Displays a centered icon and title at the top of a report page.
 class ReportPageHeader extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -25,19 +21,21 @@ class ReportPageHeader extends StatelessWidget {
     required this.icon,
     required this.label,
   });
-
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        children: [Icon(icon, size: AppDimens.iconSizeLg, color: AppColors.primary),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: AppDimens.fontTitle,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+             child: Column(
+                      children: [
+                        Icon(icon,
+                            size: AppDimens.iconSizeLg,
+                            color: AppColors.primary
+                        ), const SizedBox(height: 12),
+                        Text(label,
+                          style: const TextStyle(
+                              fontFamily:'Tajawal',
+                              fontSize: AppDimens.fontTitle,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
             ),
           ),
         ],
@@ -45,50 +43,32 @@ class ReportPageHeader extends StatelessWidget {
     );
   }
 }
-
-
-// ══════════════════════════════════════════════
 // 2. Field Label
-// ══════════════════════════════════════════════
-
-// Renders a bold label above a form field with consistent vertical spacing.
-// Renders a bold label above a form field with consistent vertical spacing.
 class FieldLabel extends StatelessWidget {
   final String text;
-
   const FieldLabel(this.text, {super.key});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: AppDimens.spaceMd, bottom: 5),
-      // استخدمنا SizedBox.expand أو عرض كامل لضمان السيطرة على المحاذاة
-      child: Container(
-        width: double.infinity, // يجبر الحاوية على أخذ عرض الشاشة كاملاً
-        alignment: Alignment.centerRight, // يحاذي ما بداخله لليمين تماماً
-        child: Text(
-          text,
-          textAlign: TextAlign.right, // تأكيد إضافي للمحاذاة داخل النص نفسه
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: AppDimens.fontMd,
-            fontFamily: 'Tajawal', // تأكدي من إضافة الخط هنا أيضاً
-            color: AppColors.textPrimary,
-          ),
-        ),
-      ),
+             padding: const EdgeInsets.only(top: AppDimens.spaceMd, bottom: 5),
+             child: Container(
+                       width: double.infinity,
+                       alignment: Alignment.centerRight,
+                       child: Text(text,
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                               fontFamily: 'Tajawal',
+                               fontWeight: FontWeight.bold,
+                               fontSize: AppDimens.fontMd,
+                               color: AppColors.textPrimary,
+                            ),
+                       ),
+             ),
     );
   }
 }
-
-
-// ══════════════════════════════════════════════
 // 3. Form Text Field
-// ══════════════════════════════════════════════
-
-// A styled TextFormField with built-in validation.
-// Shows a specific error if [readOnly] is true (location field),
-// or a generic required-field error otherwise.
 class Textfield extends StatelessWidget {
   final String hint;
   final TextEditingController controller;
@@ -107,83 +87,84 @@ class Textfield extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      maxLines: maxLines,
-      textAlign: TextAlign.right,
-      readOnly: readOnly,
-      onTap: onTap,
-      style: const TextStyle(fontSize: AppDimens.fontMd, color: AppColors.textPrimary),
-
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          if (readOnly) return 'يرجى تحديد الموقع من الخريطة';
-          return 'هذا الحقل مطلوب';
-        }
-        return null;
-      },
-
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(fontSize: AppDimens.fontSm, color: AppColors.textHint),
-        filled: true,
-        fillColor: AppColors.fieldBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
-          borderSide: BorderSide.none,
+    return Directionality(
+        textDirection: TextDirection.rtl,
+        child: TextFormField(
+               controller: controller,
+               autovalidateMode: AutovalidateMode.onUserInteraction,
+               maxLines: maxLines,
+               textAlign: TextAlign.right,
+               readOnly: readOnly,
+               onTap: onTap,
+               style: const TextStyle(
+                   fontSize: AppDimens.fontMd,
+                   color: AppColors.textPrimary
+               ),
+               validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                         if (readOnly) return 'يرجى تحديد الموقع من الخريطة';
+                        return 'هذا الحقل مطلوب';
+                    }
+                    return null;
+               },
+               decoration: InputDecoration(
+                             hintText: hint,
+                             hintStyle: const TextStyle(
+                                 fontSize: AppDimens.fontSm,
+                                 color: AppColors.textHint
+                             ),
+                             filled: true,
+                             fillColor: AppColors.fieldBg,
+                             contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                             border: OutlineInputBorder(
+                                       borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
+                                       borderSide: BorderSide.none,
+                             ),
+                             focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
+                                        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                             ),
+                            errorBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
+                                        borderSide: const BorderSide(color: AppColors.error, width: 1),
+                            ),
+                           errorStyle: const TextStyle(
+                               color: AppColors.error,
+                              fontFamily: 'Tajawal',
+                              fontSize: 12,
+                             ),
+               ),
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
-          borderSide: const BorderSide(color: AppColors.error, width: 1),
-        ),
-      ),
     );
   }
 }
-
-
-// ══════════════════════════════════════════════
 // 4. Location Picker Button
-// ══════════════════════════════════════════════
-
-// A text button with a pin icon that triggers the map picker screen.
 class LocationPickerButton extends StatelessWidget {
   final VoidCallback onTap;
-
   const LocationPickerButton({super.key, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment.centerRight,
-      child: TextButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.location_on_outlined, size: 18, color: AppColors.primary),
-        label: const Text(
-          'تحديد الموقع من الخريطة',
-          style: TextStyle(
-            fontFamily: 'Tajawal',
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
+               alignment: Alignment.centerRight,
+               child: TextButton.icon(
+                             onPressed: onTap,
+                             icon: const Icon(Icons.location_on_outlined,
+                                 size: 18,
+                                 color: AppColors.primary
+                             ),
+                             label: const Text('تحديد الموقع من الخريطة',
+                                style: TextStyle(
+                                   fontFamily: 'Tajawal',
+                                   color: AppColors.primary,
+                                   fontWeight: FontWeight.bold,
+                                ),
+                             ),
+               ),
     );
   }
 }
-
-
-// ══════════════════════════════════════════════
 // 5. Image Picker Row
-// ══════════════════════════════════════════════
-
-// Renders two equal-width buttons side by side for picking
-// an image from the camera or the photo gallery.
 class ImagePickerRow extends StatelessWidget {
   final VoidCallback onPickFromCamera;
   final VoidCallback onPickFromGallery;
@@ -197,34 +178,28 @@ class ImagePickerRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: [
-        Expanded(
-          child: GradientButton(
-            label: 'الكاميرا',
-            icon: Icons.camera_alt_outlined,
-            onTap: onPickFromCamera,
-          ),
-        ),
-        const SizedBox(width: AppDimens.spaceSm),
-        Expanded(
-          child: GradientButton(
-            label: 'ألبوم الصور',
-            icon: Icons.photo_library_outlined,
-            onTap: onPickFromGallery,
-          ),
-        ),
-      ],
+              children: [
+                        Expanded(
+                              child: WaterRippleButton(
+                                    text: 'ألبوم الصور',
+                                    icon: Icons.photo_library_outlined,
+                                    onTap: onPickFromGallery,
+                                    height:40,
+                              ),
+                        ), const SizedBox(width: AppDimens.spaceSm),
+                        Expanded(
+                              child: WaterRippleButton(
+                                   text: 'الكاميرا',
+                                   icon: Icons.camera_alt_outlined,
+                                   onTap: onPickFromCamera,
+                                   height:40,
+                              ),
+                        ),
+              ],
     );
   }
 }
-
-
-// ══════════════════════════════════════════════
 // 6. Selected Image Preview
-// ══════════════════════════════════════════════
-
-// Shows a thumbnail of the picked image with a red remove button overlay.
-// Handles both web (network) and mobile (file) image sources.
 class SelectedImagePreview extends StatelessWidget {
   final XFile image;
   final VoidCallback onRemove;
@@ -238,67 +213,66 @@ class SelectedImagePreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: AppDimens.spaceMd),
-      child: Stack(
-        alignment: Alignment.topRight,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
-            child: kIsWeb
-                ? Image.network(image.path, height: 80, width: 80, fit: BoxFit.cover)
-                : Image.file(File(image.path), height: 80, width: 80, fit: BoxFit.cover),
-          ),
-          GestureDetector(
-            onTap: onRemove,
-            child: Container(
-              margin: const EdgeInsets.all(4),
-              decoration: const BoxDecoration(
-                color: AppColors.error,
-                shape: BoxShape.circle,
+              padding: const EdgeInsets.only(top: AppDimens.spaceMd),
+              child: Stack(
+                      alignment: Alignment.topRight,
+                      children: [
+                           ClipRRect(
+                                borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
+                                child: kIsWeb ?
+                                         Image.network(image.path,
+                                             height: 80,
+                                             width: 80,
+                                             fit: BoxFit.cover
+                                         ) : Image.file(File(image.path),
+                                             height: 80,
+                                             width: 80,
+                                             fit: BoxFit.cover
+                                         ),
+                           ),
+                          GestureDetector(
+                             onTap: onRemove,
+                             child: Container(
+                                      margin: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                           color: AppColors.error,
+                                           shape: BoxShape.circle,
+                                      ),
+                                     child: const Icon(Icons.close,
+                                         color: Colors.white,
+                                         size: 18
+                                     ),
+                             ),
+                          ),
+                      ],
               ),
-              child: const Icon(Icons.close, color: Colors.white, size: 18),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
-
-
-// ══════════════════════════════════════════════
 // 7. Image Required Error
-// ══════════════════════════════════════════════
-
-// Displays a small red error message when no image has been selected.
 class ImageRequiredError extends StatelessWidget {
   final String message;
-
   const ImageRequiredError({super.key, required this.message});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 6, right: 12),
-      child: Text(
-        message,
-        style: const TextStyle(color: AppColors.error, fontSize: AppDimens.fontSm),
-      ),
+             padding: const EdgeInsets.only(top: 6, right: 12),
+             child: Text(message,
+                   style: const TextStyle(
+                       color: AppColors.error,
+                       fontSize: AppDimens.fontSm
+                   ),
+             ),
     );
   }
 }
-
-
-// ══════════════════════════════════════════════
-// 8. Form Action Buttons
-// ══════════════════════════════════════════════
-
-// Renders the Publish and Cancel buttons side by side at the bottom of the form.
-class FormActionButtons extends StatelessWidget {
+// 8. Publish and Cancel buttons
+class PublishAndCancelButtons extends StatelessWidget {
   final VoidCallback onPublish;
   final VoidCallback onCancel;
 
-  const FormActionButtons({
+  const PublishAndCancelButtons({
     super.key,
     required this.onPublish,
     required this.onCancel,
@@ -307,75 +281,28 @@ class FormActionButtons extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      children: [
-        Expanded(
-          child: GradientButton(
-            label: 'انشر البلاغ',
-            icon: Icons.add_circle_outline_rounded,
-            onTap: onPublish,
-          ),
-        ),
-        const SizedBox(width: AppDimens.spaceMd),
-        Expanded(
-          child: GradientButton(
-            label: 'إلغاء',
-            icon: Icons.close_rounded,
-            onTap: onCancel,
-          ),
-        ),
-      ],
+            children: [
+                   Expanded(
+                     child: WaterRippleButton(
+                              text: 'انشر البلاغ',
+                              icon: Icons.add_circle_outline_rounded,
+                              onTap: onPublish,
+                              height:40,
+                     ),
+                   ), const SizedBox(width: AppDimens.spaceSm),
+                  Expanded(
+                     child: WaterRippleButton(
+                              text: 'إلغاء',
+                              icon: Icons.close_rounded,
+                              onTap: onCancel,
+                              height:40,
+                     ),
+                  ),
+            ],
     );
   }
 }
 
-
-// ══════════════════════════════════════════════
-// 9. Gradient Button
-// ══════════════════════════════════════════════
-
-// A reusable full-width button with a gradient background, an icon, and a label.
-// Used as the primary action button throughout the app.
-class GradientButton extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const GradientButton({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 13),
-        decoration: BoxDecoration(
-          gradient: kPrimaryGradient,
-          borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: AppDimens.fontLg,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Icon(icon, color: Colors.white, size: 16),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 // ══════════════════════════════════════════════
 // 10. Water Ripple Button (نسخة مشروع دلة النهائية)
@@ -387,6 +314,7 @@ class WaterRippleButton extends StatelessWidget {
   final bool isLoading;
   final double width;
   final double height;
+  final IconData? icon;
 
   const WaterRippleButton({
     super.key,
@@ -394,59 +322,64 @@ class WaterRippleButton extends StatelessWidget {
     required this.onTap,
     this.isLoading = false,
     this.width = double.infinity,
-    this.height = AppDimens.buttonHeight, // استخدمنا الطول الموحد من الثيم
+    this.height = AppDimens.buttonHeight,
+    this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        // استخدام التدرج الموحد المعرف في ملف الثيم
-        gradient: kPrimaryGradient,
-        // استخدام انحناء الزوايا المتوسط من AppDimens
-        borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
-        boxShadow: const [
-          BoxShadow(
-            color: AppColors.shadowColor, // استخدمنا لون الظل المخصص في الثيم
-            blurRadius: 10,
-            offset: Offset(0, 5),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            splashFactory: InkRipple.splashFactory,
-            splashColor: Colors.white.withOpacity(0.4),
-            highlightColor: Colors.transparent,
-            onTap: isLoading ? null : onTap,
-            child: Center(
-              child: isLoading
-                  ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
-                ),
-              )
-                  : Text(
-                text,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: AppDimens.fontXl, // حجم خط مناسب للأزرار
-                  fontFamily: 'Tajawal', // استخدمنا الخط المعتمد في الثيم
-                ),
-              ),
+              width: width,
+              height: height,
+              decoration: BoxDecoration(
+                            gradient: kPrimaryGradient,
+                            borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
+                            boxShadow: const [BoxShadow(
+                                     color: AppColors.shadowColor,
+                                     blurRadius: 10,
+                                     offset: Offset(0, 5),
+                            ),
+                            ],
+             ),
+            child: ClipRRect(
+                     borderRadius: BorderRadius.circular(AppDimens.radiusMedium),
+                     child: Material(
+                           color: Colors.transparent,
+                           child: InkWell(
+                                 splashFactory: InkRipple.splashFactory,
+                                 splashColor: Colors.white.withOpacity(0.4),
+                                 highlightColor: Colors.transparent,
+                                 onTap: isLoading ? null : onTap,
+                                 child: Center(
+                                          child: isLoading ? const SizedBox(
+                                                                     width: 24,
+                                                                     height: 24,
+                                                                     child: CircularProgressIndicator(
+                                                                           color: Colors.white,
+                                                                           strokeWidth: 2,
+                                                                     ),
+                                                              ) : Row(
+                                                                   mainAxisAlignment: MainAxisAlignment.center,
+                                                                   children: [
+                                                                        if (icon != null) ...[
+                                                                           Icon(icon,
+                                                                               color: Colors.white,
+                                                                               size: 20
+                                                                           ), const SizedBox(width: 8),],
+                                                                           Text(text,
+                                                                             style: const TextStyle(
+                                                                                color: Colors.white,
+                                                                                fontWeight: FontWeight.bold,
+                                                                                fontSize: AppDimens.fontLg,
+                                                                                fontFamily: 'Tajawal',
+                                                                             ),
+                                                                           ),
+                                                                   ],
+                                                              )
+                                 ),
+                           ),
+                     ),
             ),
-          ),
-        ),
-      ),
     );
   }
 }
@@ -702,7 +635,6 @@ class CustomOTPField extends StatelessWidget {
   }
 }
 
-
 class CustomFloatingNavBar extends StatelessWidget {
   final int currentIndex;
   final Function(int)? onTap; // اختياري لو تبغين تسوين شي إضافي
@@ -808,6 +740,52 @@ class CustomFloatingNavBar extends StatelessWidget {
           color: isSelected ? AppColors.primaryDark : AppColors.primary,
         ),
       ),
+    );
+  }
+}
+
+class InfoRow extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final bool isRtl;
+  final Color? color;
+
+  const InfoRow({
+    super.key,
+    required this.text,
+    required this.icon,
+    this.isRtl = true,
+    this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final displayColor = color ?? Colors.grey;
+    return Padding(
+             padding: const EdgeInsets.only(bottom: 3),
+             child: Row(
+                      mainAxisAlignment: isRtl ? MainAxisAlignment.end : MainAxisAlignment.start,
+                      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
+                      children: [
+                          Icon(icon,
+                             size: 15,
+                             color: displayColor,
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(text,
+                               textAlign: isRtl ? TextAlign.right : TextAlign.left,
+                               maxLines: 1,
+                               overflow: TextOverflow.ellipsis,
+                               style: TextStyle(
+                                 fontFamily: 'Tajawal',
+                                 fontSize: 12,
+                                 color: displayColor,
+                               ),
+                            ),
+                          ),
+                      ],
+             ),
     );
   }
 }
