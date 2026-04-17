@@ -10,6 +10,8 @@ import '../services/database_serv.dart';
 import '../models/user_model.dart';
 import '../widgets/custom_widgets.dart';
 import '../utils/app_theme.dart';
+import 'package:intl/intl.dart';
+import 'matches_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -152,55 +154,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildDismissibleReport(Report report) {
-    return Dismissible(
-      key: Key(report.reportId ?? ""),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (direction) => _showDeleteConfirmation(context),
-      onDismissed: (direction) => _itemService.deleteReport(report.reportId!, report.item.imageURL),
-      background: Container(
-        alignment: Alignment.centerRight, padding: const EdgeInsets.symmetric(horizontal: 20),
-        margin: const EdgeInsets.only(bottom: 15),
-        decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(20)),
-        child: const Icon(Icons.delete_outline, color: AppColors.white, size: 30),
-      ),
-      child: InkWell(
-        onTap: () => _showReportDetails(context, report),
-        child: _buildReportCard(
-          report.item.category,
-          report.item.description,
-          report.type == 'lost' ? "بلاغ مفقود" : "بلاغ معثور",
-          report.item.color,
-          report.type == 'lost' ? Icons.location_on_outlined : Icons.check_circle_outline,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReportCard(String title, String subtitle, String status, String colorInfo, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15), padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color:AppColors.purble.withOpacity(0.2))),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(status, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: AppColors.primary, fontFamily: 'Tajawal')),
-            Text(colorInfo, style: const TextStyle(color: Colors.grey, fontSize: 10, fontFamily: 'Tajawal')),
-          ]),
-          Expanded(child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color:AppColors.darkgray, fontFamily: 'Tajawal'), overflow: TextOverflow.ellipsis),
-              Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Tajawal'), overflow: TextOverflow.ellipsis),
-            ])),
-            const SizedBox(width: 12),
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, size: 22, color: AppColors.darkpurble)),
-          ])),
-        ],
-      ),
-    );
-  }
-
 
   Widget _buildSideMenu(BuildContext context) {
     return Drawer(
@@ -266,61 +219,7 @@ class _HomePageState extends State<HomePage> {
     ]));
   }
 
-  Future<bool?> _showDeleteConfirmation(BuildContext context) {
-    return showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: const Text("تأكيد الحذف", textAlign: TextAlign.right, style: TextStyle(fontFamily: 'Tajawal')),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")),
-        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("حذف", style: TextStyle(color: Colors.red))),
-      ],
-    ));
-  }
 
-  void _showReportDetails(BuildContext context, Report report) {
-    showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start, // عشان الكلام يترتب لليمين
-            children: [
-              Center(
-                child: Text(
-                    report.type == 'lost' ? "تفاصيل المفقود" : "تفاصيل المعثور عليه",
-                    style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold)
-                ),
-              ),
-              const Divider(),
-              _buildDetailRow("الفئة", report.item.category),
-              _buildDetailRow("اللون", report.item.color),
-              _buildDetailRow("الوصف", report.item.description),
-
-              // --- الإضافة هنا (الموقع بالتفصيل) ---
-              _buildDetailRow("الموقع", report.locationName),
-              // ------------------------------------
-
-              const SizedBox(height: 20),
-              Center(
-                child: ElevatedButton(
-                    onPressed: () {
-                      // هنا مستقبلاً تربطينها بخوارزمية الذكاء الاصطناعي
-                    },
-                    child: const Text("عرض التطابق الذكي", style: TextStyle(fontFamily: 'Tajawal'))
-                ),
-              ),
-            ],
-          ),
-        )
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-      Text(value, style: const TextStyle(fontFamily: 'Tajawal')),
-      Text(" :$label", style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
-    ]));
-  }
 
   void _openReportSheet(BuildContext context) {
     showModalBottomSheet(
@@ -338,4 +237,219 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
+  Future<bool?> _showDeleteConfirmation(BuildContext context) {
+    return showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text("تأكيد الحذف",
+          textAlign: TextAlign.right,
+          style: TextStyle(
+              fontFamily: 'Tajawal'
+          )
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false),
+            child:  Text("إلغاء")),
+        TextButton(onPressed: () => Navigator.pop(context, true),
+            child:  Text("حذف", style:
+            TextStyle(
+                color: Colors.red)
+            )
+        ),
+      ],
+    ));
+  }
+
+  Widget _buildDismissibleReport(Report report) {
+    return Dismissible(
+             key: Key(report.reportId ?? ''),
+             direction: DismissDirection.startToEnd,
+             confirmDismiss: (_) => _showDeleteConfirmation(context),
+             onDismissed: (_) { _itemService.deleteReport(report.reportId!, report.item.imageURL); },
+             background: Container(
+                         alignment: Alignment.centerLeft,
+                         padding: EdgeInsets.symmetric(horizontal: 20),
+                         margin: EdgeInsets.only(bottom: 15),
+                         decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(20),
+                         ),
+                         child: Icon(Icons.delete_outline,
+                             color: Colors.white,
+                             size: 30
+                         ),
+             ),
+             child: Container(
+                 margin: EdgeInsets.only(bottom: 15),
+                 decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.purble.withOpacity(0.2)),
+                    boxShadow: [BoxShadow(
+                       color: Colors.black.withOpacity(0.03),
+                       blurRadius: 10
+                      ),
+                    ],
+                ),
+                child: Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                                 tilePadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                 leading: Icon(Icons.keyboard_arrow_down_rounded,
+                                            color: AppColors.primary,
+                                            size: 28,
+                                 ),
+                                 trailing: CircleAvatar(
+                                    backgroundColor: AppColors.primary,
+                                    radius: 18,
+                                    child: Icon(report.type == 'lost' ? Icons.search_rounded : Icons.person_search_outlined,
+                                            color: Colors.white,
+                                            size: 20,
+                                    ),
+                                 ),
+                                 title: Text(report.item.category,
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            fontFamily: 'Tajawal',
+                                            fontSize: AppDimens.fontXl,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                 ),
+                                 subtitle: _buildCompactSubtitle(report),
+                                 children: [
+                                           _buildExpandedDetails(report),
+                                           ],
+                        ),
+                ),
+             ),
+    );
+  }
+
+  Widget _buildCompactSubtitle(Report report) {
+    String location = report.locationName.split('—').first.trim();
+    return Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                        Text(DateFormat('d MMM', 'ar').format(report.createdAt),
+                          style: TextStyle(
+                              fontSize:AppDimens.fontSm,
+                              color: AppColors.textSecondary
+                          ),
+                        ),const SizedBox(width: 4),
+                        Icon(Icons.access_time,
+                            size: AppDimens.fontSm,
+                            color: AppColors.textSecondary
+                        ), const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(location,
+                             textAlign: TextAlign.right,
+                             maxLines: 1,
+                             style: TextStyle(
+                                 fontSize: AppDimens.fontSm,
+                                 color: AppColors.textSecondary
+                             ),
+                          ),
+                        ), const SizedBox(width: 4),
+                        Icon(Icons.place_outlined,
+                             size: AppDimens.fontSm,
+                             color: AppColors.textSecondary
+                        ),
+             ],
+    );
+  }
+
+
+  Widget _buildExpandedDetails(Report report) {
+    return Padding(
+             padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+             child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.end,
+                       children: [
+                                   Divider(height: 20, thickness: 0.5),
+                                   if (report.item.imageURL.isNotEmpty)
+                                      Container(
+                                         margin: EdgeInsets.only(bottom: 15),
+                                         constraints: BoxConstraints(maxHeight: 250),
+                                         width: double.infinity,
+                                         decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(15),
+                                              color: Colors.grey[50],
+                                         ),
+                                         child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(15),
+                                                child: Image.network(report.item.imageURL,
+                                                         fit: BoxFit.contain,
+                                                         loadingBuilder: (context, child, loadingProgress) {
+                                                           if (loadingProgress == null) return child;
+                                                           return  Center(
+                                                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                                           );
+                                                         },
+                                                        errorBuilder: (context, error, stackTrace) {
+                                                           return const Icon(Icons.image_not_supported_outlined,
+                                                                           size: 50,
+                                                                           color: Colors.grey,
+                                                          );
+                                                       },
+                                               ),
+                                         ),
+                                      ),
+                                      InfoRow(
+                                          text: DateFormat('yyyy/MM/dd   hh:mm a', 'ar').format(report.createdAt),
+                                          icon: Icons.calendar_today_outlined,
+                                          isRtl: true,
+                                          color:AppColors.textSecondary,
+                                      ),const SizedBox(height: 12),
+                                    InfoRow(
+                                         text: report.locationName,
+                                         icon: Icons.place_outlined,
+                                         isRtl: true,
+                                         color:AppColors.textSecondary,
+                                    ), const SizedBox(height: 12),
+                                    InfoRow(
+                                        text: report.item.color,
+                                        icon: Icons.palette_outlined,
+                                        isRtl: true,
+                                        color:AppColors.textSecondary,
+                                    ),const SizedBox(height: 12),
+                                    InfoRow(
+                                       text:  " ${report.item.description} - ${report.item.uniqueFeatures}",
+                                       icon: Icons.description_outlined,
+                                       isRtl: true,
+                                      color:AppColors.textSecondary,
+                                   ),const SizedBox(height: 25),
+                                    WaterRippleButton(
+                                       text: 'عرض التطابق الذكي',
+                                       icon: Icons.psychology,
+                                       onTap: () => _onMatchButtonTapped(report),
+                                     ),
+                       ],
+             ),
+    );
+  }
+
+  void _onMatchButtonTapped(Report report) {
+    if (report.ai_status == 'completed') {
+         Navigator.push(
+             context,
+             MaterialPageRoute(
+                 builder: (context) => MatchesPage(matches: report.matches,currentUid: currentUid,),
+             ),
+         );
+    } else {
+        String message = report.ai_status == 'error' ? 'حدث خطأ في المعالجة' : '... جاري تحليل الصور والنصوص للمطابقة ';
+        Color snackColor = report.ai_status == 'error' ? Colors.red : Colors.orange;
+         ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                 content: Text(message,
+                     textAlign: TextAlign.right,
+                     style: const TextStyle(
+                         fontFamily: 'Tajawal'
+                     )
+                 ),
+                 backgroundColor: snackColor,
+              ),
+         );
+    }
+  }
+
 }
