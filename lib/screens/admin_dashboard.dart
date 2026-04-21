@@ -191,7 +191,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         children: [
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 15, horizontal: 4),
-            child: Text("تحليل النشاط ",
+            child: Text("تحليل النشاط السنوي",
                 style: TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: AppDimens.fontLg)),
           ),
 
