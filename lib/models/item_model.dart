@@ -1,13 +1,10 @@
-// lib/models/item_model.dart
-
 class Item {
-  String category;
-  String description;
-  String color;
-  String imageURL;
-  String uniqueFeatures;
+  final String category;
+  final String description;
+  final String color;
+  final String imageURL;
+  final String uniqueFeatures;
 
-  /// Creates an [Item] with all required fields.
   Item({
     required this.category,
     required this.description,
@@ -16,7 +13,6 @@ class Item {
     required this.uniqueFeatures,
   });
 
-  /// Converts this [Item] into a [Map] for Firestore storage.
   Map<String, dynamic> toMap() {
     return {
       'category': category,
@@ -27,7 +23,6 @@ class Item {
     };
   }
 
-  /// Creates an [Item] from a Firestore document [map].
   factory Item.fromMap(Map<String, dynamic> map) {
     return Item(
       category: map['category'] ?? '',
