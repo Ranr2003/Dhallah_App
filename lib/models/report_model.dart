@@ -1,9 +1,7 @@
-// lib/models/report_model.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:latlong2/latlong.dart';
 import 'item_model.dart';
 
-/// Base class for all report types.
 class Report {
   final String? reportId;
   final String type;
@@ -29,7 +27,6 @@ class Report {
     required this.createdAt,
   });
 
-  /// Converts this [Report] into a [Map] for Firestore storage.
   Map<String, dynamic> toMap() {
     return {
       'reportId': reportId,
@@ -45,7 +42,6 @@ class Report {
     };
   }
 
-  /// Creates a [Report] from a Firestore document [map] and document [id].
   factory Report.fromMap(Map<String, dynamic> map, String id) {
     final geo = map['geo_location'] as GeoPoint?;
     return Report(
