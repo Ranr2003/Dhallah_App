@@ -12,7 +12,6 @@ import '../services/authentication_serv.dart';
 
 class LostReportPage extends StatefulWidget {
   const LostReportPage({super.key});
-
   @override
   State<LostReportPage> createState() => _LostReportPageState();
 }
@@ -20,9 +19,7 @@ class LostReportPage extends StatefulWidget {
 class _LostReportPageState extends State<LostReportPage> {
   final ItemService _itemService = ItemService();
   final AuthenticationService _authService = AuthenticationService();
-
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
-
   final TextEditingController _typeController  = TextEditingController();
   final TextEditingController _descController  = TextEditingController();
   final TextEditingController _colorController = TextEditingController();
@@ -32,9 +29,8 @@ class _LostReportPageState extends State<LostReportPage> {
   XFile? _selectedImage;
   PickedLocation? _pickedLocation;
   bool _isPublishing = false;
+  bool _showImageError = false;
 
-
-  /// Disposes all text controllers to free resources.
   @override
   void dispose() {
     _typeController.dispose();
@@ -45,21 +41,19 @@ class _LostReportPageState extends State<LostReportPage> {
     super.dispose();
   }
 
-  /// Opens the camera or gallery to pick an image.
   Future<void> _pickImage(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
     final XFile? pickedFile = await picker.pickImage(source: source);
     if (pickedFile != null) {
-      setState(() => _selectedImage = pickedFile);
+      setState(() {
+        _selectedImage = pickedFile;
+        _showImageError = false;
+      });
     }
   }
 
-  /// Navigates to the map picker and stores the selected location.
   Future<void> _pickLocation() async {
-    final PickedLocation? result = await Navigator.push<PickedLocation>(
-      context,
-      MaterialPageRoute(builder: (context) => const MapPickerPage()),
-    );
+    final PickedLocation? result = await Navigator.push<PickedLocation>(context, MaterialPageRoute(builder: (context) => const MapPickerPage()),);
     if (result != null) {
       setState(() {
         _pickedLocation = result;
@@ -68,7 +62,6 @@ class _LostReportPageState extends State<LostReportPage> {
     }
   }
 
-  /// Shows a styled auto-dismiss dialog with a custom icon and message.
   void _showNotice({
     required DialogType type,
     required String title,
@@ -78,49 +71,53 @@ class _LostReportPageState extends State<LostReportPage> {
     VoidCallback? onOk,
   }) {
     AwesomeDialog(
-      context: context,
-      dialogType: DialogType.noHeader,
-      animType: AnimType.scale,
-      autoHide: const Duration(seconds: 3),
-      dialogBorderRadius: BorderRadius.circular(20),
-      btnOk: const SizedBox.shrink(),
-      body: Column(
-        children: [
-          const SizedBox(height: 15),
-          Icon(iconData, color: iconColor, size: 60),
-          const SizedBox(height: 10),
-          Text(
-            title,
-            style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 15),
-            child: Text(
-              desc,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontFamily: 'Cairo', fontSize: 14),
-            ),
-          ),
-          const SizedBox(height: 25),
-        ],
+       context: context,
+       dialogType: DialogType.noHeader,
+       animType: AnimType.scale,
+       autoHide: const Duration(seconds: 3),
+       dialogBorderRadius: BorderRadius.circular(20),
+       btnOk: const SizedBox.shrink(),
+       body: Column(
+                children: [
+                       const SizedBox(height: 15),
+                       Icon(iconData,
+                           color: iconColor,
+                           size: 60
+                       ),
+                       const SizedBox(height: 10),
+                       Text(title,
+                         style: const TextStyle(
+                                        fontFamily: 'Tajawal',
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18
+                         ),
+                       ),
+                       const SizedBox(height: 8),
+                       Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 15),
+                          child: Text(desc,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                                            fontFamily: 'Tajawal',
+                                            fontSize: 14
+                            ),
+                          ),
+                       ), const SizedBox(height: 25),
+                ],
       ),
-      onDismissCallback: (typeOfDismiss) {
-        if (type == DialogType.success && onOk != null) onOk();
-      },
+      onDismissCallback: (typeOfDismiss) {if (type == DialogType.success && onOk != null) onOk();},
     ).show();
   }
 
-  /// Validates the form, builds the report, and uploads it to Firestore.
   Future<void> _publishReport() async {
+    setState(() {
+      _showImageError = _selectedImage == null;
+    });
     bool isFormValid = _formKey.currentState?.validate() ?? false;
     bool hasLocation = _pickedLocation != null;
     bool hasImage = _selectedImage != null;
-
     if (!isFormValid || !hasLocation || !hasImage) return;
-
     setState(() => _isPublishing = true);
-
     try {
       final item = Item(
         category: _typeController.text.trim(),
@@ -129,7 +126,6 @@ class _LostReportPageState extends State<LostReportPage> {
         uniqueFeatures: _featController.text.trim(),
         imageURL: '',
       );
-
       final report = Report(
         type: "lost",
         userId: _authService.currentUserId,
@@ -138,11 +134,8 @@ class _LostReportPageState extends State<LostReportPage> {
         coordinates: _pickedLocation!.coordinates,
         createdAt: DateTime.now(),
       );
-
       await _itemService.uploadReport(report, _selectedImage);
-
       if (!mounted) return;
-
       _showNotice(
         type: DialogType.success,
         title: 'تم بنجاح',
@@ -158,7 +151,7 @@ class _LostReportPageState extends State<LostReportPage> {
         title: 'فشل النشر',
         desc: 'حدث خطأ: $e',
         iconData: Icons.cancel_outlined,
-        iconColor: Colors.red,
+        iconColor: AppColors.error,
       );
     } finally {
       if (mounted) setState(() => _isPublishing = false);
@@ -167,43 +160,47 @@ class _LostReportPageState extends State<LostReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Builds the lost item report form with fields, image picker, and location picker.
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
       child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            const ReportPageHeader(
-              icon: Icons.search_rounded,
-              label: 'ضيعت شيء وتدور عليه؟',
-            ),
-            const SizedBox(height: 20),
-            FieldLabel('نوعه'),
-            Textfield(hint: 'مثال: محفظة، جوال، بطاقة...', controller: _typeController),
-            FieldLabel('الوصف'),
-            Textfield(hint: 'الحجم، حالة الشيء، أي تفاصيل مهمة...', controller: _descController, maxLines: 2),
-            FieldLabel('اللون'),
-            Textfield(hint: 'مثال: أسود، فضي...', controller: _colorController),
-            FieldLabel('المكان'),
-            Textfield(hint: 'أين فُقد؟ حدد الموقع من الخريطة', controller: _placeController, readOnly: true),
-            LocationPickerButton(onTap: _pickLocation),
-            FieldLabel('صورة للغرض'),
-            ImagePickerRow(
-              onPickFromCamera: () => _pickImage(ImageSource.camera),
-              onPickFromGallery: () => _pickImage(ImageSource.gallery),
-            ),
-            if (_selectedImage != null)
-              SelectedImagePreview(image: _selectedImage!, onRemove: () => setState(() => _selectedImage = null)),
-            FieldLabel('علامات فارقة'),
-            Textfield(hint: 'مثال: خدش، ملصق، قطعة مكسورة...', controller: _featController),
-            const SizedBox(height: 30),
-            _isPublishing
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)))
-                : FormActionButtons(onPublish: _publishReport, onCancel: () => Navigator.pop(context)),
-          ],
-        ),
+               key: _formKey,
+               child: Column(
+                         crossAxisAlignment: CrossAxisAlignment.end,
+                         children: [
+                           const ReportPageHeader(
+                                   icon: Icons.search_rounded,
+                                   label: 'ضيعت شيء وتدور عليه؟',
+                           ),
+                           const SizedBox(height: 20),
+                           FieldLabel('نوعه'),
+                           Textfield(hint: 'مثال: محفظة، جوال، بطاقة...', controller: _typeController),
+                           FieldLabel('الوصف'),
+                           Textfield(hint: 'الحجم، حالة الشيء، أي تفاصيل مهمة...', controller: _descController, maxLines: 2),
+                           FieldLabel('اللون'),
+                           Textfield(hint: 'مثال: أسود، فضي...', controller: _colorController),
+                           FieldLabel('المكان'),
+                           Textfield(hint: 'أين فُقد؟ حدد الموقع من الخريطة', controller: _placeController, readOnly: true),
+                           LocationPickerButton(onTap: _pickLocation),
+                           FieldLabel('صورة للغرض'),
+                           ImagePickerRow(
+                             onPickFromCamera: () => _pickImage(ImageSource.camera),
+                             onPickFromGallery: () => _pickImage(ImageSource.gallery),
+                           ),
+                          if (_showImageError && _selectedImage == null)
+                              const ImageRequiredError(message: 'يرجى إرفاق صورة للغرض'),
+                          if (_selectedImage != null)
+                            SelectedImagePreview(
+                              image: _selectedImage!,
+                              onRemove: () => setState(() => _selectedImage = null),
+                            ),
+                          FieldLabel('علامات فارقة'),
+                          Textfield(hint: 'مثال: خدش، ملصق، قطعة مكسورة...', controller: _featController),
+                          const SizedBox(height: 30),
+                          _isPublishing ? const Center(child: CircularProgressIndicator(color: AppColors.primary)) : PublishAndCancelButtons(
+                                                                                                                      onPublish: _publishReport,
+                                                                                                                      onCancel: () => Navigator.pop(context)),
+                         ],
+               ),
       ),
     );
   }

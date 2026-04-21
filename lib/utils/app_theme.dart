@@ -11,13 +11,19 @@ abstract class AppColors {
   static const Color primary     = Color(0xFFB293CD);
   static const Color primaryDark = Color(0xFF8A6AAF);
   static const Color secondary   = Color(0xFFE8DDF1);
+  static const Color purble      = Color(0xFFD2B4EC);
+  static const Color darkpurble  = Color(0xFF5A4A75);
+  static const Color dustyPurple = Color(0xFF9681A8);
+
 
   // Background & UI Elements
   static const Color background  = Color(0xFFFFFFFF);
   static const Color fieldBg     = Color(0xFFF9F9F9);
   static const Color white       = Colors.white;
 
+
   // Typography Colors
+  static const Color darkgray      = Color(0xFF333333);
   static const Color textPrimary   = Color(0xFF1A1A2E);
   static const Color textSecondary = Color(0xFF666680);
   static const Color textHint      = Color(0xFFAAAAAA);
@@ -29,6 +35,10 @@ abstract class AppColors {
   // Miscellaneous
   static const Color mapPin      = Color(0xFFE53935);
   static const Color shadowColor = Color(0x1AB293CD);
+
+  //icons
+  static const Color logouticon      = Colors.redAccent;
+
 }
 
 // ══════════════════════════════════════════════

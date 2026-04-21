@@ -1,8 +1,10 @@
+import 'package:dhallah_app/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 // استيراد الخلفية الموحدة
-import '../widgets/login_signup_background.dart';
+import '../widgets/Wavy_Background.dart';
 // استيراد ويدجت الزر
-import '../widgets/custom_button1.dart';
+//import '../widgets/custom_button1.dart';
+import '../widgets/custom_widgets.dart';
 
 class StartPage extends StatefulWidget {
   const StartPage({super.key});
@@ -25,7 +27,7 @@ class _StartPageState extends State<StartPage> {
       ),
       child: Scaffold(
         // استخدام LoginSignupBackground لتكون الخلفية نفس الهوم
-        body: LoginSignupBackground(
+        body: WavyBackground(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {
@@ -73,16 +75,16 @@ class _StartPageState extends State<StartPage> {
                                   style: TextStyle(
                                     fontSize: screenWidth * 0.055,
                                     // لون متناسق مع ثيم الهوم (اللون البنفسجي الغامق)
-                                    color: const Color(0xFF5A4A75),
+                                    color: AppColors.darkpurble,
                                     fontWeight: FontWeight.bold,
-                                    fontFamily: 'Cairo', // توحيد الخط مع الهوم
+                                    fontFamily: 'Tajawal', // توحيد الخط مع الهوم
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 50),
                               const Text(
                                 "إضغط في أي مكان للبدء",
-                                style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Cairo'),
+                                style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Tajawal'),
                               ),
                             ],
                           ),
@@ -115,9 +117,9 @@ class _StartPageState extends State<StartPage> {
                                 child: const Text(
                                   "تخطي والدخول كضيف",
                                   style: TextStyle(
-                                    color: Color(0xFFB293CD), // لون بنفسجي فاتح للتخطي
+                                    color: AppColors.primary, // لون بنفسجي فاتح للتخطي
                                     fontSize: 14,
-                                    fontFamily: 'Cairo',
+                                    fontFamily: 'Tajawal',
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),

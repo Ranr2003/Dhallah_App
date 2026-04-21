@@ -1,26 +1,25 @@
-//login_signup_background.dart
-//Rand
+// Wavy_Background.dart
 import 'package:flutter/material.dart';
+import '../utils/app_theme.dart';
 
-class LoginSignupBackground extends StatelessWidget {
+class WavyBackground extends StatelessWidget {
   final Widget child;
 
-  const LoginSignupBackground({super.key, required this.child});
+  const WavyBackground({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // أزلنا اللون الثابت هنا واستبدلنا الـ body بـ Container للتدرج
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFFFBF8FF), // أبيض مائل للبنفسجي في الأعلى
-              Color(0xFFE8DDF4), // الموفي الفاتح في الأسفل ليختلط مع التموجات
+              Color(0xFFFBF8FF), // لون فاتح جداً متناغم مع الثيم
+              AppColors.secondary, // استخدام لون الثيم الثانوي
             ],
-            stops: [0.6, 1.0], // يبدأ التدرج بالظهور فعلياً بعد منتصف الشاشة
+            stops: [0.6, 1.0],
           ),
         ),
         child: Stack(
@@ -41,26 +40,24 @@ class LoginSignupBackground extends StatelessWidget {
 class BackgroundPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill;
+    final paint = Paint()..style = PaintingStyle.fill;
 
     // التموجات العلوية
     _updrawBottomWaves(canvas, size, paint);
 
-    // التموجات السفليه
+    // التموجات السفلية
     _drawBottomWaves(canvas, size, paint);
   }
 
   void _updrawBottomWaves(Canvas canvas, Size size, Paint paint) {
-    // التموجات العلوية في الجهه اليمنى
-    // الايمن الخلفي السفلي
+    // التموجات العلوية في الجهة اليمنى
     final Rect rectRight1 = Rect.fromLTWH(size.width * 0.5, 0, size.width * 0.9, size.height * 0.25);
-    paint.shader = LinearGradient(
+    paint.shader = const LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
       colors: [
-        const Color(0xFFB293CD),
-        const Color(0xFFE8DDF4),
+        AppColors.primary, // تم الاستبدال
+        AppColors.secondary, // تم الاستبدال
       ],
     ).createShader(rectRight1);
 
@@ -71,13 +68,12 @@ class BackgroundPainter extends CustomPainter {
     pathRight1.close();
     canvas.drawPath(pathRight1, paint);
 
-    // الايمن الامامي العلوي
-    paint.shader = LinearGradient(
+    paint.shader = const LinearGradient(
       begin: Alignment.centerRight,
       end: Alignment.centerLeft,
       colors: [
-        const Color(0xFFB293CD),
-        const Color(0xFFE8DDF4),
+        AppColors.primary,
+        AppColors.secondary,
       ],
     ).createShader(rectRight1);
 
@@ -88,18 +84,17 @@ class BackgroundPainter extends CustomPainter {
     pathRight2.close();
     canvas.drawPath(pathRight2, paint);
 
-    // التموجات العلوية في الجهه اليسرى
-    //  الايسر الامامي السفلي
+    // التموجات العلوية في الجهة اليسرى
     final Rect rect1 = Rect.fromLTWH(0, 0, size.width, size.height * 0.35);
-    paint.shader = LinearGradient(
+    paint.shader = const LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
       colors: [
-        Colors.white,
-        const Color(0xFFE8DDF4),
-        const Color(0xFFB293CD),
+        AppColors.white,
+        AppColors.secondary,
+        AppColors.primary,
       ],
-      stops: const [0.0, 0.03, 1.0],
+      stops: [0.0, 0.03, 1.0],
     ).createShader(rect1);
 
     var pathLeft1 = Path();
@@ -109,17 +104,16 @@ class BackgroundPainter extends CustomPainter {
     pathLeft1.close();
     canvas.drawPath(pathLeft1, paint);
 
-    // الايسر الخلفي العلوي
     final Rect rect2 = Rect.fromLTWH(0, 0, size.width, size.height * 0.28);
-    paint.shader = LinearGradient(
+    paint.shader = const LinearGradient(
       begin: Alignment.centerLeft,
       end: Alignment.centerRight,
       colors: [
-        const Color(0xFFB293CD),
-        const Color(0xFFE8DDF4),
-        Colors.white,
+        AppColors.primary,
+        AppColors.secondary,
+        AppColors.white,
       ],
-      stops: const [0.0, 0.75, 1.0],
+      stops: [0.0, 0.75, 1.0],
     ).createShader(rect2);
 
     var pathLeft2 = Path();
@@ -129,14 +123,13 @@ class BackgroundPainter extends CustomPainter {
     pathLeft2.close();
     canvas.drawPath(pathLeft2, paint);
   }
-//---------------------------------------------------------------------------------------
+
   void _drawBottomWaves(Canvas canvas, Size size, Paint paint) {
-    // التموجات السفليه في جهه اليسار
-    //التموج الخلفي في الاعلى
-    paint.shader = LinearGradient(
+    // التموجات السفلية في جهة اليسار
+    paint.shader = const LinearGradient(
       begin: Alignment.bottomLeft,
       end: Alignment.bottomRight,
-      colors: [const Color(0xFFB293CD), const Color(0xFFFBF8FF)],
+      colors: [AppColors.primary, Color(0xFFFBF8FF)],
     ).createShader(Rect.fromLTWH(0, size.height * 0.9, size.width, size.height * 0.1));
 
     var pathLeft1 = Path();
@@ -147,11 +140,10 @@ class BackgroundPainter extends CustomPainter {
     pathLeft1.close();
     canvas.drawPath(pathLeft1, paint);
 
-    //التموج الامامي في الاسفل
-    paint.shader = LinearGradient(
+    paint.shader = const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [const Color(0xFFE8DDF4), const Color(0xFFB293CD)]
+        colors: [AppColors.secondary, AppColors.primary]
     ).createShader(Rect.fromLTWH(0, size.height * 0.8, size.width, size.height * 0.2));
 
     var pathLeftL2 = Path();
@@ -162,12 +154,11 @@ class BackgroundPainter extends CustomPainter {
     pathLeftL2.close();
     canvas.drawPath(pathLeftL2, paint);
 
-    //التموجات السفلية في جهه اليمين
-    // الخلفي في الاعلى
+    // التموجات السفلية في جهة اليمين
     paint.shader = LinearGradient(
       begin: Alignment.centerRight,
       end: Alignment.centerLeft,
-      colors: [const Color(0xFFB293CD).withOpacity(0.5), const Color(0xFFB293CD)],
+      colors: [AppColors.primary.withOpacity(0.5), AppColors.primary],
       stops: const [0.0, 0.2],
     ).createShader(Rect.fromLTWH(0, size.height * 0.8, size.width, size.height * 0.2));
 
@@ -179,11 +170,10 @@ class BackgroundPainter extends CustomPainter {
     pathRight1.close();
     canvas.drawPath(pathRight1, paint);
 
-    // الأمامي في الاسفل
-    paint.shader = LinearGradient(
+    paint.shader = const LinearGradient(
       begin: Alignment.bottomRight,
       end: Alignment.bottomLeft,
-      colors: [const Color(0xFFB293CD), const Color(0xFFE8DDF4), const Color(0xFFE8DDF4)],
+      colors: [AppColors.primary, AppColors.secondary, AppColors.secondary],
     ).createShader(Rect.fromLTWH(0, size.height * 0.85, size.width, size.height * 0.15));
 
     var pathRight2 = Path();
@@ -196,5 +186,5 @@ class BackgroundPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(CustomPainter oldDelegate) => true;
+  bool shouldRepaint(CustomPainter oldDelegate) => false; // تغيير لـ false للأداء طالما الرسم ثابت
 }
