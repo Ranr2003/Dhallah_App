@@ -1,3 +1,5 @@
+import 'package:dhallah_app/screens/chat_list_page.dart';
+import 'package:dhallah_app/screens/messages_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart'; // 1. أضيفي هذا الاستيراد للغة
@@ -42,6 +44,8 @@ class MyApp extends StatelessWidget {
         '/login': (context) => const LoginPage(),
         '/signup': (context) => const SignUpPage(),
         '/home': (context) => const HomePage(),
+        '/chatList': (context) => const ChatListPage(),
+        '/messages': (context) => const MessagesPage(receiverId: '', userName: '', chatRoomId: '',),
       },
     );
   }
