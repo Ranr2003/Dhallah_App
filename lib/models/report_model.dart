@@ -10,7 +10,6 @@ class Report {
   final String userId;
   final String status;
   final String ai_status;
-  final String? vector_id;
   final List<Map<String, dynamic>> matches;
   final Item item;
   final String locationName;
@@ -23,7 +22,6 @@ class Report {
     required this.userId,
     this.status = "open",
     this.ai_status = "pending",
-    this.vector_id = "",
     this.matches = const [],
     required this.item,
     required this.locationName,
@@ -39,7 +37,6 @@ class Report {
       'userId': userId,
       'status': status,
       'ai_status': ai_status,
-      'vector_id': vector_id,
       'matches': matches,
       'item': item.toMap(),
       'locationName': locationName,
@@ -57,7 +54,6 @@ class Report {
       userId: map['userId'] ?? '',
       status: map['status'] ?? 'open',
       ai_status: map['ai_status'] ?? 'pending',
-      vector_id: map['vector_id'] ?? '',
       matches: List<Map<String, dynamic>>.from(map['matches'] ?? []),
       item: Item.fromMap(map['item'] ?? {}),
       locationName: map['locationName'] ?? '',

@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/item_serv.dart';
 import '../services/authentication_serv.dart';
 import '../models/report_model.dart';
-import '../widgets/login_signup_background.dart';
-import 'account_info_page.dart';
+import '../widgets/Wavy_Background.dart';
 import 'login_page.dart';
 import 'lost_report_page.dart';
 import 'found_report_page.dart';
 import '../services/database_serv.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../models/user_model.dart';
+import '../widgets/custom_widgets.dart';
+import '../utils/app_theme.dart';
+import 'package:intl/intl.dart';
+import 'matches_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -29,13 +30,84 @@ class _HomePageState extends State<HomePage> {
   String userName = "زائر";
   String currentUid = "";
 
-  static const Color dustyPurple = Color(0xFF9681A8);
-  static const Color dustyPurpleLight = Color(0xFFDED6E6);
 
   @override
+  Widget _buildGuestEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // أيقونة تعبر عن الحساب أو الدخول
+          const SizedBox(height: 16),
+          const Text(
+            "سجل دخولك لتتمكن من\nإضافة ومتابعة بلاغاتك",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Tajawal',
+            ),
+          ),
+          const SizedBox(height: 20),
+          // زر اختياري يوجهه لصفحة تسجيل الدخول
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+              );
+            },
+            child: const Text(
+              "تسجيل الدخول الآن",
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+                fontFamily: 'Tajawal',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  // دالة لمراقبة حالة الحساب (هل تم حظره؟)
+  void _listenToAccountStatus() {
+    final user = _authService.getCurrentUser();
+    if (user != null) {
+      // مراقبة وثيقة المستخدم في Firestore بشكل مباشر
+      _dbService.getUserStream(user.uid).listen((userData) {
+        if (userData != null && userData.isBanned == true && mounted) {
+          _forceLogout(); // طرده فوراً
+        }
+      });
+    }
+  }
+
+// دالة تسجيل الخروج الإجباري والتحويل لصفحة الدخول
+  Future<void> _forceLogout() async {
+    await _authService.logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
+      );
+      // إظهار رسالة تنبيه
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("تم حظر حسابك لمخالفة السياسات، يرجى التواصل مع الدعم.",
+              textAlign: TextAlign.right,
+              style: TextStyle(fontFamily: 'Tajawal')),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
   void initState() {
     super.initState();
     _loadUserData();
+    _listenToAccountStatus(); // 👈 أضيفي هذا السطر هنا
   }
   final DatabaseService _dbService = DatabaseService();
   Future<void> _loadUserData() async {
@@ -53,121 +125,84 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-
-  void _navigateToProfile() async {
-    final prefs = await SharedPreferences.getInstance();
-    String? savedMethod = prefs.getString('loginMethod');
-
-    // ✅ الصح: نطلب المستخدم من السيرفس وليس من الفايربيس مباشرة
-    fb.User? user = _authService.getCurrentUser();
-
-    // نحدد طريقة الدخول (قوقل أو إيميل)
-    String finalProvider = savedMethod ??
-        (user?.providerData.any((p) => p.providerId == 'password') == true ? 'email' : 'google');
-
-    if (mounted) {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => ProfilePage(
-        userEmail: user?.email ?? user?.phoneNumber ?? "",
-        loginProvider: finalProvider,
-        canEditPassword: false,
-        initialName: userName, // نمرر الاسم اللي جبناه أصلاً من الـ DatabaseService
-      )));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // نستخدم dynamic هنا لتجنب استيراد مكتبة الفايربيس في هذا الملف
-    return StreamBuilder<dynamic>(
-        stream: _dbService.getUserStream(fb.FirebaseAuth.instance.currentUser?.uid ?? ""),
-        builder: (context, banSnapshot) {
-
-          if (banSnapshot.hasData && banSnapshot.data != null) {
-            // بما أن النوع dynamic، نصل للبيانات عبر الخاصية data()
-            // ونحولها لـ Map لنتعامل معها بسهولة
-            final data = banSnapshot.data.data();
-            if (data != null && data is Map<String, dynamic>) {
-
-              // فحص حالة الحظر
-              if (data['isBanned'] == true) {
-                Future.microtask(() async {
-                  await _authService.logout();
-                  if (context.mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                        MaterialPageRoute(builder: (context) => const LoginPage()),
-                            (route) => false
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("تم حظرك من قبل الإدارة"), backgroundColor: Colors.redAccent)
-                    );
-                  }
-                });
-                return const Scaffold(body: Center(child: CircularProgressIndicator(color: Color(0xFFB293CD))));
-              }
-            }
-          }
-
-          // 2. واجهة الصفحة الرئيسية (تعمل فقط إذا لم يكن محظوراً)
-          return Scaffold(
-            key: _scaffoldKey,
-            endDrawer: _buildSideMenu(context),
-            body: LoginSignupBackground(
-              child: Stack(
-                children: [
-                  SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          const SizedBox(height: 20),
-                          _buildTopBar(),
-                          const SizedBox(height: 30),
-                          Text("مرحباً $userName،",
-                              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Color(0xFF5A4A75), fontFamily: 'Cairo')),
-                          const Text("!جاهزين نساعدك بأي مفقود",
-                              style: TextStyle(fontSize: 16, color: Colors.grey, fontWeight: FontWeight.w500, fontFamily: 'Cairo')),
-                          const SizedBox(height: 35),
-                          _buildActionHeader(context),
-                          const SizedBox(height: 20),
-                          Expanded(
-                            child: (currentUid.isEmpty)
-                                ? const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)))
-                                : StreamBuilder<List<Report>>(
-                              stream: _itemService.getMyReportsStream(currentUid),
-                              builder: (context, reportSnapshot) {
-                                if (reportSnapshot.connectionState == ConnectionState.waiting) {
-                                  return const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)));
-                                }
-
-                                if (reportSnapshot.hasError) {
-                                  return const Center(child: Text("حدث خطأ في تحميل البيانات", style: TextStyle(fontFamily: 'Cairo')));
-                                }
-
-                                if (!reportSnapshot.hasData || reportSnapshot.data!.isEmpty) {
-                                  return _buildEmptyState();
-                                }
-
-                                final myReports = reportSnapshot.data!;
-                                return ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 100),
-                                  itemCount: myReports.length,
-                                  itemBuilder: (context, index) => _buildDismissibleReport(myReports[index]),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+  Widget _buildMainScaffold() {
+    return Scaffold(
+      key: _scaffoldKey,
+      endDrawer: _buildSideMenu(context),
+      body: WavyBackground(
+        child: Stack(
+          children: [
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    const SizedBox(height: 20),
+                    _buildTopBar(),
+                    const SizedBox(height: 30),
+                    Text("مرحباً $userName،", style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primaryDark, fontFamily: 'Tajawal')),
+                    const Text("!جاهزين نساعدك بأي مفقود", style: TextStyle(fontSize: 16, color: AppColors.textSecondary, fontWeight: FontWeight.w500, fontFamily: 'Tajawal')),
+                    const SizedBox(height: 35),
+                    _buildActionHeader(context),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: (currentUid.isEmpty)
+                          ? _buildGuestEmptyState() // دالة جديدة للزائر
+                          : StreamBuilder<List<Report>>(
+                        stream: _itemService.getMyReportsStream(currentUid),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                          }
+                          if (snapshot.hasError) {
+                            return const Center(child: Text("حدث خطأ في تحميل البيانات", style: TextStyle(fontFamily: 'Tajawal')));
+                          }
+                          if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                            return _buildEmptyState();
+                          }
+                          final myReports = snapshot.data!;
+                          return ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 100),
+                            itemCount: myReports.length,
+                            itemBuilder: (context, index) => _buildDismissibleReport(myReports[index]),
+                          );
+                        },
                       ),
                     ),
-                  ),
-                  _buildFloatingNavBar(context),
-                ],
+                  ],
+                ),
               ),
             ),
-          );
-        } // إغلاق الـ builder الخاص بحارس الحظر
-    ); // إغلاق الـ StreamBuilder الخاص بحارس الحظر
+            const CustomFloatingNavBar(currentIndex: 1),
+          ],
+        ),
+      ),
+    );
+  }
+  @override
+  @override
+  Widget build(BuildContext context) {
+    // 1. إذا كان زائر (UID فارغ)، اعرضي الواجهة مباشرة بدون حارس الحظر
+    if (currentUid.isEmpty) {
+      return _buildMainScaffold();
+    }
+
+    // 2. إذا كان مستخدم مسجل، فعلي حارس الحظر
+    return StreamBuilder<dynamic>(
+      stream: _dbService.getUserStream(currentUid),
+      builder: (context, snapshot) {
+        // فحص الحظر
+        if (snapshot.hasData && snapshot.data != null) {
+          final userData = snapshot.data!.data() as Map<String, dynamic>?;
+          if (userData != null && userData['isBanned'] == true) {
+            Future.microtask(() => _forceLogout());
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+        }
+        return _buildMainScaffold();
+      },
+    );
   }
   // --- دوال بناء الواجهة (نفس ستايلك القديم تماماً) ---
 
@@ -175,9 +210,9 @@ class _HomePageState extends State<HomePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        IconButton(icon: const Icon(Icons.notifications_none_rounded, size: 30, color: Color(0xFF5A4A75)), onPressed: () {}),
+        IconButton(icon: const Icon(Icons.notifications_none_rounded, size: 30, color: AppColors.primaryDark), onPressed: () {}),
         Image.asset('resourses/DallahAppLogo2.png', height: 45, errorBuilder: (context, error, stackTrace) => const Icon(Icons.apps)),
-        IconButton(icon: const Icon(Icons.menu_rounded, size: 30, color: Color(0xFF5A4A75)), onPressed: () => _scaffoldKey.currentState?.openEndDrawer()),
+        IconButton(icon: const Icon(Icons.menu_rounded, size: 30, color: AppColors.primaryDark), onPressed: () => _scaffoldKey.currentState?.openEndDrawer()),
       ],
     );
   }
@@ -187,107 +222,48 @@ class _HomePageState extends State<HomePage> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Container(
-          decoration: BoxDecoration(color: const Color(0xFFB293CD).withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
+          decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
           child: TextButton.icon(
-            onPressed: () => _openReportSheet(context),
-            icon: const Icon(Icons.add_circle_outline, color: Color(0xFF5A4A75)),
-            label: const Text("بلاغ جديد", style: TextStyle(color: Color(0xFF5A4A75), fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+            onPressed: () {
+              if (currentUid.isEmpty) {
+                _showGuestWarning(context); // استخدام الرسالة الجميلة
+              } else {
+                _openReportSheet(context);
+              }
+            },
+            icon: const Icon(Icons.add_circle_outline, color: AppColors.primaryDark),
+            label: const Text("بلاغ جديد", style: TextStyle(color:AppColors.primaryDark, fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
           ),
         ),
         const Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text("متابعة البلاغات", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF333333), fontFamily: 'Cairo')),
-            Text("تحديث مباشر من السيرفر", style: TextStyle(fontSize: 11, color: Colors.grey, fontFamily: 'Cairo')),
+            Text("متابعة البلاغات", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary, fontFamily: 'Tajawal')),
+            Text("تحديث مباشر من السيرفر", style: TextStyle(fontSize: 11, color:AppColors.textSecondary, fontFamily: 'Tajawal')),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildDismissibleReport(Report report) {
-    return Dismissible(
-      key: Key(report.reportId ?? ""),
-      direction: DismissDirection.endToStart,
-      confirmDismiss: (direction) => _showDeleteConfirmation(context),
-      onDismissed: (direction) => _itemService.deleteReport(report.reportId!, report.item.imageURL),
-      background: Container(
-        alignment: Alignment.centerRight, padding: const EdgeInsets.symmetric(horizontal: 20),
-        margin: const EdgeInsets.only(bottom: 15),
-        decoration: BoxDecoration(color: Colors.redAccent, borderRadius: BorderRadius.circular(20)),
-        child: const Icon(Icons.delete_outline, color: Colors.white, size: 30),
-      ),
-      child: InkWell(
-        onTap: () => _showReportDetails(context, report),
-        child: _buildReportCard(
-          report.item.category,
-          report.item.description,
-          report.type == 'lost' ? "بلاغ مفقود" : "بلاغ معثور",
-          report.item.color,
-          report.type == 'lost' ? Icons.location_on_outlined : Icons.check_circle_outline,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildReportCard(String title, String subtitle, String status, String colorInfo, IconData icon) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15), padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFFD2B4EC).withOpacity(0.2))),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(status, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFFB293CD), fontFamily: 'Cairo')),
-            Text(colorInfo, style: const TextStyle(color: Colors.grey, fontSize: 10, fontFamily: 'Cairo')),
-          ]),
-          Expanded(child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-              Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF333333), fontFamily: 'Cairo'), overflow: TextOverflow.ellipsis),
-              Text(subtitle, style: const TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Cairo'), overflow: TextOverflow.ellipsis),
-            ])),
-            const SizedBox(width: 12),
-            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: const Color(0xFFB293CD).withOpacity(0.1), shape: BoxShape.circle), child: Icon(icon, size: 22, color: const Color(0xFF5A4A75))),
-          ])),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFloatingNavBar(BuildContext context) {
-    return Positioned(
-      left: 25, right: 25, bottom: 25,
-      child: Container(
-        height: 65, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(25), boxShadow: [BoxShadow(color: const Color(0xFFD2B4EC).withOpacity(0.3), blurRadius: 20)]),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFFB293CD), size: 26),
-            Container(padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8), decoration: BoxDecoration(color: const Color(0xFFB293CD).withOpacity(0.1), borderRadius: BorderRadius.circular(15)), child: const Icon(Icons.home_rounded, color: Color(0xFF5A4A75), size: 26)),
-            InkWell(onTap: _navigateToProfile, child: const Icon(Icons.person_outline_rounded, color: Color(0xFFB293CD), size: 28)),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildSideMenu(BuildContext context) {
     return Drawer(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.white,
       child: Column(
         children: [
           // الهيدر: يعرض شعار التطبيق واسم المستخدم
           Container(
             width: double.infinity,
             padding: const EdgeInsets.only(top: 60, bottom: 30),
-            color: dustyPurple.withOpacity(0.05),
+            color:AppColors.dustyPurple.withOpacity(0.05),
             child: Column(
               children: [
-                const Icon(Icons.blur_on_rounded, color: dustyPurple, size: 60),
+                const Icon(Icons.blur_on_rounded, color: AppColors.dustyPurple, size: 60),
                 const SizedBox(height: 12),
                 Text(
                   userName,
-                  style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF5A4A75)),
+                  style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.darkpurble),
                 ),
               ],
             ),
@@ -312,7 +288,7 @@ class _HomePageState extends State<HomePage> {
                 );
               }
             },
-            color: Colors.redAccent,
+            color: AppColors.logouticon,
           ),
           const SizedBox(height: 20),
         ],
@@ -321,75 +297,21 @@ class _HomePageState extends State<HomePage> {
   }
 
 // دالة مساعدة لاختصار الكود وتكرار الأزرار
-  Widget _buildMenuTile(IconData icon, String title, VoidCallback onTap, {Color color = dustyPurple}) {
+  Widget _buildMenuTile(IconData icon, String title, VoidCallback onTap, {Color color = AppColors.dustyPurple}) {
     return ListTile(
       leading: Icon(icon, color: color),
-      title: Text(title, style: TextStyle(fontFamily: 'Cairo', color: color == Colors.redAccent ? color : Colors.black87)),
+      title: Text(title, style: TextStyle(fontFamily: 'Tajawal', color: color == Colors.redAccent ? color : Colors.black87)),
       onTap: onTap,
     );
   }
   Widget _buildEmptyState() {
     return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
       Icon(Icons.search_off_rounded, size: 80, color: Colors.grey.withOpacity(0.5)),
-      const Text("لا توجد بلاغات حالياً", style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
+      const Text("لا توجد بلاغات حالياً", style: TextStyle(fontSize: 18, color: Colors.grey, fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
     ]));
   }
 
-  Future<bool?> _showDeleteConfirmation(BuildContext context) {
-    return showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: const Text("تأكيد الحذف", textAlign: TextAlign.right, style: TextStyle(fontFamily: 'Cairo')),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")),
-        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("حذف", style: TextStyle(color: Colors.red))),
-      ],
-    ));
-  }
 
-  void _showReportDetails(BuildContext context, Report report) {
-    showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start, // عشان الكلام يترتب لليمين
-            children: [
-              Center(
-                child: Text(
-                    report.type == 'lost' ? "تفاصيل المفقود" : "تفاصيل المعثور عليه",
-                    style: const TextStyle(fontFamily: 'Cairo', fontWeight: FontWeight.bold)
-                ),
-              ),
-              const Divider(),
-              _buildDetailRow("الفئة", report.item.category),
-              _buildDetailRow("اللون", report.item.color),
-              _buildDetailRow("الوصف", report.item.description),
-
-              // --- الإضافة هنا (الموقع بالتفصيل) ---
-              _buildDetailRow("الموقع", report.locationName),
-              // ------------------------------------
-
-              const SizedBox(height: 20),
-              Center(
-                child: ElevatedButton(
-                    onPressed: () {
-                      // هنا مستقبلاً تربطينها بخوارزمية الذكاء الاصطناعي
-                    },
-                    child: const Text("عرض التطابق الذكي", style: TextStyle(fontFamily: 'Cairo'))
-                ),
-              ),
-            ],
-          ),
-        )
-    );
-  }
-
-  Widget _buildDetailRow(String label, String value) {
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-      Text(value, style: const TextStyle(fontFamily: 'Cairo')),
-      Text(" :$label", style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'Cairo')),
-    ]));
-  }
 
   void _openReportSheet(BuildContext context) {
     showModalBottomSheet(
@@ -398,13 +320,260 @@ class _HomePageState extends State<HomePage> {
         length: 2, initialIndex: 1,
         child: Container(
           height: MediaQuery.of(context).size.height * 0.85,
-          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
+          decoration: const BoxDecoration(color: AppColors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(30))),
           child: const Column(children: [
-            TabBar(indicatorColor: Color(0xFFB293CD), tabs: [Tab(text: "لقيت شي؟"), Tab(text: "ضيعت شي؟")]),
+            TabBar(indicatorColor: AppColors.primary, tabs: [Tab(text: "لقيت شي؟"), Tab(text: "ضيعت شي؟")]),
             Expanded(child: TabBarView(children: [FoundReportPage(), LostReportPage()])),
           ]),
         ),
       ),
     );
   }
+
+  Future<bool?> _showDeleteConfirmation(BuildContext context) {
+    return showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text("تأكيد الحذف",
+          textAlign: TextAlign.right,
+          style: TextStyle(
+              fontFamily: 'Tajawal'
+          )
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false),
+            child:  Text("إلغاء")),
+        TextButton(onPressed: () => Navigator.pop(context, true),
+            child:  Text("حذف", style:
+            TextStyle(
+                color: Colors.red)
+            )
+        ),
+      ],
+    ));
+  }
+
+  Widget _buildDismissibleReport(Report report) {
+    return Dismissible(
+             key: Key(report.reportId ?? ''),
+             direction: DismissDirection.startToEnd,
+             confirmDismiss: (_) => _showDeleteConfirmation(context),
+             onDismissed: (_) { _itemService.deleteReport(report.reportId!, report.item.imageURL); },
+             background: Container(
+                         alignment: Alignment.centerLeft,
+                         padding: EdgeInsets.symmetric(horizontal: 20),
+                         margin: EdgeInsets.only(bottom: 15),
+                         decoration: BoxDecoration(
+                              color: Colors.redAccent,
+                              borderRadius: BorderRadius.circular(20),
+                         ),
+                         child: Icon(Icons.delete_outline,
+                             color: Colors.white,
+                             size: 30
+                         ),
+             ),
+             child: Container(
+                 margin: EdgeInsets.only(bottom: 15),
+                 decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.purble.withOpacity(0.2)),
+                    boxShadow: [BoxShadow(
+                       color: Colors.black.withOpacity(0.03),
+                       blurRadius: 10
+                      ),
+                    ],
+                ),
+                child: Theme(
+                        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                        child: ExpansionTile(
+                                 tilePadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                 leading: Icon(Icons.keyboard_arrow_down_rounded,
+                                            color: AppColors.primary,
+                                            size: 28,
+                                 ),
+                                 trailing: CircleAvatar(
+                                    backgroundColor: AppColors.primary,
+                                    radius: 18,
+                                    child: Icon(report.type == 'lost' ? Icons.search_rounded : Icons.person_search_outlined,
+                                            color: Colors.white,
+                                            size: 20,
+                                    ),
+                                 ),
+                                 title: Text(report.item.category,
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            fontFamily: 'Tajawal',
+                                            fontSize: AppDimens.fontXl,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                 ),
+                                 subtitle: _buildCompactSubtitle(report),
+                                 children: [
+                                           _buildExpandedDetails(report),
+                                           ],
+                        ),
+                ),
+             ),
+    );
+  }
+
+  Widget _buildCompactSubtitle(Report report) {
+    String location = report.locationName.split('—').first.trim();
+    return Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                        Text(DateFormat('d MMM', 'ar').format(report.createdAt),
+                          style: TextStyle(
+                              fontSize:AppDimens.fontSm,
+                              color: AppColors.textSecondary
+                          ),
+                        ),const SizedBox(width: 4),
+                        Icon(Icons.access_time,
+                            size: AppDimens.fontSm,
+                            color: AppColors.textSecondary
+                        ), const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(location,
+                             textAlign: TextAlign.right,
+                             maxLines: 1,
+                             style: TextStyle(
+                                 fontSize: AppDimens.fontSm,
+                                 color: AppColors.textSecondary
+                             ),
+                          ),
+                        ), const SizedBox(width: 4),
+                        Icon(Icons.place_outlined,
+                             size: AppDimens.fontSm,
+                             color: AppColors.textSecondary
+                        ),
+             ],
+    );
+  }
+
+
+  Widget _buildExpandedDetails(Report report) {
+    return Padding(
+             padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+             child: Column(
+                       crossAxisAlignment: CrossAxisAlignment.end,
+                       children: [
+                                   Divider(height: 20, thickness: 0.5),
+                                   if (report.item.imageURL.isNotEmpty)
+                                      Container(
+                                         margin: EdgeInsets.only(bottom: 15),
+                                         constraints: BoxConstraints(maxHeight: 250),
+                                         width: double.infinity,
+                                         decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(15),
+                                              color: Colors.grey[50],
+                                         ),
+                                         child: ClipRRect(
+                                                borderRadius: BorderRadius.circular(15),
+                                                child: Image.network(report.item.imageURL,
+                                                         fit: BoxFit.contain,
+                                                         loadingBuilder: (context, child, loadingProgress) {
+                                                           if (loadingProgress == null) return child;
+                                                           return  Center(
+                                                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                                           );
+                                                         },
+                                                        errorBuilder: (context, error, stackTrace) {
+                                                           return const Icon(Icons.image_not_supported_outlined,
+                                                                           size: 50,
+                                                                           color: Colors.grey,
+                                                          );
+                                                       },
+                                               ),
+                                         ),
+                                      ),
+                                      InfoRow(
+                                          text: DateFormat('yyyy/MM/dd   hh:mm a', 'ar').format(report.createdAt),
+                                          icon: Icons.calendar_today_outlined,
+                                          isRtl: true,
+                                          color:AppColors.textSecondary,
+                                      ),const SizedBox(height: 12),
+                                    InfoRow(
+                                         text: report.locationName,
+                                         icon: Icons.place_outlined,
+                                         isRtl: true,
+                                         color:AppColors.textSecondary,
+                                    ), const SizedBox(height: 12),
+                                    InfoRow(
+                                        text: report.item.color,
+                                        icon: Icons.palette_outlined,
+                                        isRtl: true,
+                                        color:AppColors.textSecondary,
+                                    ),const SizedBox(height: 12),
+                                    InfoRow(
+                                       text:  " ${report.item.description} - ${report.item.uniqueFeatures}",
+                                       icon: Icons.description_outlined,
+                                       isRtl: true,
+                                      color:AppColors.textSecondary,
+                                   ),const SizedBox(height: 25),
+                                    WaterRippleButton(
+                                       text: 'عرض التطابق الذكي',
+                                       icon: Icons.psychology,
+                                       onTap: () => _onMatchButtonTapped(report),
+                                     ),
+                       ],
+             ),
+    );
+  }
+
+  void _onMatchButtonTapped(Report report) {
+    if (report.ai_status == 'completed') {
+         Navigator.push(
+             context,
+             MaterialPageRoute(
+                 builder: (context) => MatchesPage(matches: report.matches,currentUid: currentUid,),
+             ),
+         );
+    } else {
+        String message = report.ai_status == 'error' ? 'حدث خطأ في المعالجة' : '... جاري تحليل الصور والنصوص للمطابقة ';
+        Color snackColor = report.ai_status == 'error' ? Colors.red : Colors.orange;
+         ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                 content: Text(message,
+                     textAlign: TextAlign.right,
+                     style: const TextStyle(
+                         fontFamily: 'Tajawal'
+                     )
+                 ),
+                 backgroundColor: snackColor,
+              ),
+         );
+    }
+  }
+  void _showGuestWarning(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent, // شفاف عشان نستخدم الـ Container حقنا
+        elevation: 0,
+        content: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 3))
+            ],
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "هذه الميزة متاحة للأعضاء فقط، سجل دخولك الآن!",
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
 }

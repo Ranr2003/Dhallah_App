@@ -1,8 +1,8 @@
+import 'package:dhallah_app/widgets/Wavy_Background.dart';
 import 'package:flutter/material.dart';
 // استيراد الخلفية الموحدة
-import '../widgets/login_signup_background.dart';
 // استيراد ويدجت الزر
-import '../widgets/custom_button1.dart';
+import '../widgets/custom_widgets.dart';
 
 class StartPage extends StatefulWidget {
   const StartPage({super.key});
@@ -25,7 +25,7 @@ class _StartPageState extends State<StartPage> {
       ),
       child: Scaffold(
         // استخدام LoginSignupBackground لتكون الخلفية نفس الهوم
-        body: LoginSignupBackground(
+        body: WavyBackground(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () {

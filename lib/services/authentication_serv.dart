@@ -14,7 +14,6 @@ import '../models/user_model.dart';
 class AuthenticationService {
   final fb.FirebaseAuth _auth = fb.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
-
   final DatabaseService _dbService = DatabaseService();
   // --- حفظ/تحديث المستخدم في Firestore ---
   // نستخدم merge: true لضمان عدم مسح البيانات القديمة
@@ -53,8 +52,6 @@ class AuthenticationService {
         } on fb.FirebaseAuthException catch (e) {
           if (e.code == 'credential-already-in-use') {
             final result = await _auth.signInWithCredential(credential);
-            // --- إضافة فحص الحظر هنا ---
-            await _checkIfBanned(result.user!.uid);
             await _saveUserData(result.user!, provider: 'google');
             return result.user;
           } else {
@@ -73,7 +70,6 @@ class AuthenticationService {
   }
 
   // --- 2. تسجيل دخول بالإيميل ---
-// --- 2. تسجيل دخول بالإيميل ---
   Future<fb.User?> login(String email, String password) async {
     try {
       final result = await _auth.signInWithEmailAndPassword(
@@ -83,46 +79,32 @@ class AuthenticationService {
       await user?.reload();
       user = _auth.currentUser;
 
-      if (user != null) {
-        // فحص الحظر
-        final userData = await _dbService.getUserById(user.uid);
-        if (userData is RegularUser && userData.isBanned) {
-          await logout();
-          // نستخدم Exception لضمان ثبات الرسالة في الويب والجوال
-          throw Exception("عذراً، هذا الحساب محظور من قبل الإدارة.");
-        }
-
-        if (!user.emailVerified) {
-          await logout();
-          throw Exception("الرجاء تفعيل البريد الإلكتروني أولاً.");
-        }
-
-        await _saveUserData(user, provider: 'email');
+      if (user != null && !user.emailVerified) {
+        await logout();
+        throw Exception("الرجاء تفعيل البريد الإلكتروني أولاً.");
       }
+
+
+      await _saveUserData(user!, provider: 'email');
       return user;
     } on fb.FirebaseAuthException catch (e) {
-      // تحويل أخطاء Firebase لرسائل مفهومة
-      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
-        throw Exception("البريد الإلكتروني أو كلمة السر غير صحيحة.");
+      // هنا نوحد جميع رسائل خطأ تسجيل الدخول في رسالة واحدة مفهومة
+      // الأكواد الشائعة: user-not-found, wrong-password, invalid-credential
+      if (e.code == 'user-not-found' ||
+          e.code == 'wrong-password' ||
+          e.code == 'invalid-credential' ||
+          e.code == 'invalid-email') {
+        throw "البريد الإلكتروني أو كلمة السر غير صحيحة.";
       } else if (e.code == 'too-many-requests') {
-        throw Exception("محاولات كثيرة خاطئة، جرب لاحقاً.");
+        throw "تمت محاولة الدخول بشكل خاطئ كثيراً، جرب لاحقاً.";
       } else {
-        throw Exception("حدث خطأ في السيرفر، حاول مجدداً.");
+        throw "حدث خطأ أثناء تسجيل الدخول، يرجى المحاولة ثانية.";
       }
-
     } catch (e) {
-      // --- التعديل الجوهري هنا ---
-      // إذا كان الخطأ هو "محظور" أو أي رسالة قمنا نحن برميها كـ Exception
-      String errorMsg = e.toString();
-      if (errorMsg.contains("محظور") || errorMsg.contains("تفعيل")) {
-        rethrow; // نرسل الرسالة كما هي للواجهة
-      }
-
-      // أي خطأ برمجي آخر (مثل خطأ في المودل) يظهر هنا
-      print("Login Error Detail: $e"); // عشان يظهر لك في الكونسول لو فيه مشكلة حقيقية
-      throw Exception("عذراً، حدث خطأ غير متوقع.");
+      throw "عذراً، حدث خطأ غير متوقع.";
     }
   }
+
   // --- 3. تسجيل مستخدم جديد ---
   Future<fb.User?> register({
     required String username,
@@ -221,18 +203,10 @@ class AuthenticationService {
         smsCode: smsCode,
       );
       final result = await _auth.signInWithCredential(credential);
-      // --- (التعديل الجوهري هنا) ---
-      final userData = await _dbService.getUserById(result.user!.uid);
-      if (userData is RegularUser && userData.isBanned) {
-        await logout(); // طرده فوراً
-        throw "عذراً، هذا الحساب محظور من قبل الإدارة.";
-      }
-      // ----------------------------
       await _saveUserData(result.user!, provider: 'phone');
       return result.user;
     } catch (e) {
-      if (e.toString().contains("محظور")) rethrow;
-      throw Exception("كود التحقق غير صحيح أو الحساب محظور");
+      throw Exception("كود التحقق غير صحيح");
     }
   }
 
@@ -242,20 +216,41 @@ class AuthenticationService {
   bool validatePassword(String password) => password.length >= 6;
 
   Future<void> logout() async {
-    await _googleSignIn.signOut();
-    await _auth.signOut();
+    try {
+      // نضع خروج قوقل داخل try-catch منفصل لأنه أحياناً يعلق إذا لم يكن المستخدم داخلاً بقوقل أصلاً
+      try {
+        await _googleSignIn.signOut();
+      } catch (e) {
+        print("Google SignOut Error: $e"); // تجاهل الخطأ واكمل
+      }
+
+      // الخروج الأساسي من فايربيس
+      await _auth.signOut();
+      print("User logged out successfully");
+    } catch (e) {
+      print("Logout Error: $e");
+      // حتى لو صار خطأ، نحاول نخرج من فايربيس كحل أخير
+      await _auth.signOut();
+    }
   }
   fb.User? getCurrentUser() {
     return _auth.currentUser;
   }
-
-  // دالة مساعدة للتأكد من أن المستخدم ليس محظوراً
-  Future<void> _checkIfBanned(String uid) async {
-    final userData = await _dbService.getUserById(uid);
-    if (userData is RegularUser && userData.isBanned) {
-      await logout(); // تسجيل خروج فوري
-      throw "عذراً، هذا الحساب محظور من قبل الإدارة.";
+  // 1. دالة لتغيير كلمة المرور (بدلاً من استدعائها مباشرة في الصفحة)
+  Future<void> updatePassword(String newPassword) async {
+    try {
+      fb.User? user = _auth.currentUser;
+      if (user != null) {
+        await user.updatePassword(newPassword);
+      }
+    } catch (e) {
+      rethrow; // نترك التعامل مع الخطأ للصفحة لتعرض التنبيه المناسب
     }
   }
 
+  // 2. دالة لجلب رقم الجوال الحالي المخزن في فايربيس (للمقارنة)
+  String? get currentPhone => _auth.currentUser?.phoneNumber;
+
+  // 3. دالة لجلب البريد الإلكتروني الحالي
+  String? get currentEmail => _auth.currentUser?.email;
 }

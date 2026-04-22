@@ -15,10 +15,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 // ---------------------------------------------------------
 import '../services/authentication_serv.dart';
 import '../services/database_serv.dart';
-import '../widgets/login_signup_background.dart';
-import '../widgets/custom_button1.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/custom_text_link.dart';
+import '../widgets/custom_widgets.dart';
+import '../widgets/Wavy_Background.dart';
 import '../screens/signup_page.dart';
 import '../screens/ForgotPassword_page.dart';
 import '../screens/account_info_page.dart';
@@ -395,7 +393,7 @@ class _LoginPageState extends State<LoginPage> {
 // الشكل للصفحه
   @override
   Widget build(BuildContext context) {
-    return LoginSignupBackground(
+    return WavyBackground(
       child: Center(
         child: SingleChildScrollView(
           child: Container(

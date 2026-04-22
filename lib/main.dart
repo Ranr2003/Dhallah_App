@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/date_symbol_data_local.dart'; // 1. أضيفي هذا الاستيراد للغة
 import 'firebase_options.dart';
 
 // استيراد الشاشات
@@ -10,6 +11,8 @@ import 'screens/home_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // 2. تهيئة بيانات اللغة العربية قبل تشغيل التطبيق
+  await initializeDateFormatting('ar', null);
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
