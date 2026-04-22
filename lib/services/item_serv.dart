@@ -1,4 +1,3 @@
-// lib/services/item_serv.dart
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -6,49 +5,45 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../models/report_model.dart';
 
-class ItemService {
+class ReportService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
 
-  /// Uploads image and saves the report document to Firestore.
-  Future<void> uploadReport(Report report, XFile? imageFile) async {
+  Future<void> submitReport(Report report, XFile? imageFile) async {
     try {
       if (imageFile == null) throw Exception('الرجاء إرفاق صورة');
-      String uploadedUrl = await _uploadXFile(imageFile);
-      DocumentReference docRef = _firestore.collection('reports').doc();
-      Map<String, dynamic> finalData = report.toMap();
-      finalData['reportId'] = docRef.id;
-      finalData['item']['imageURL'] = uploadedUrl;
-      await docRef.set(finalData);
+      String uploadedUrl = await _uploadImageToStorage(imageFile);
+      DocumentReference newReportRef = _firestore.collection('reports').doc();
+      Map<String, dynamic> reportMap = report.toMap();
+      reportMap['reportId'] = newReportRef.id;
+      reportMap['item']['imageURL'] = uploadedUrl;
+      await newReportRef.set(reportMap);
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Returns a real-time stream of reports belonging to the given user [uid].
-  Stream<List<Report>> getMyReportsStream(String uid) {
+  Stream<List<Report>> getUserReportsStream(String userId) {
     return _firestore
         .collection('reports')
-        .where('userId', isEqualTo: uid)
+        .where('userId', isEqualTo: userId)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => Report.fromMap(doc.data(), doc.id))
+        .map((querySnapshot) => querySnapshot.docs
+        .map((docSnapshot) => Report.fromMap(docSnapshot.data(), docSnapshot.id))
         .toList());
   }
 
-  /// Fetches a single report by its [reportId], returns null if not found.
-  Future<Report?> getReportById(String reportId) async {
+  Future<Report?> fetchReportById(String reportId) async {
     try {
-      final doc = await _firestore.collection('reports').doc(reportId).get();
-      final data = doc.data();
-      if (data != null) return Report.fromMap(data, doc.id);
+      final reportDoc = await _firestore.collection('reports').doc(reportId).get();
+      final reportData = reportDoc.data();
+      if (reportData != null) return Report.fromMap(reportData, reportDoc.id);
       return null;
     } catch (e) {
       rethrow;
     }
   }
 
-  /// Deletes a report document and its associated image from storage.
   Future<void> deleteReport(String reportId, String? imageUrl) async {
     try {
       await _firestore.collection('reports').doc(reportId).delete();
@@ -60,29 +55,17 @@ class ItemService {
     }
   }
 
-  /// Returns a real-time stream of all reports ordered by creation date.
-  Stream<List<Report>> getAllReportsStream() {
-    return _firestore
-        .collection('reports')
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-        .map((doc) => Report.fromMap(doc.data(), doc.id))
-        .toList());
-  }
-
-  /// Uploads an [XFile] image to Firebase Storage and returns its download URL.
-  Future<String> _uploadXFile(XFile file) async {
-    String fileName = 'reports/${DateTime.now().millisecondsSinceEpoch}.jpg';
-    Reference ref = _storage.ref().child(fileName);
+  Future<String> _uploadImageToStorage(XFile imageFile) async {
+    String storagePath = 'reports/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    Reference storageRef = _storage.ref().child(storagePath);
     if (kIsWeb) {
-      await ref.putData(
-        await file.readAsBytes(),
+      await storageRef.putData(
+        await imageFile.readAsBytes(),
         SettableMetadata(contentType: 'image/jpeg'),
       );
     } else {
-      await ref.putFile(File(file.path));
+      await storageRef.putFile(File(imageFile.path));
     }
-    return await ref.getDownloadURL();
+    return await storageRef.getDownloadURL();
   }
 }

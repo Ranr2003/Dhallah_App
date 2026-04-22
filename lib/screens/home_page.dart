@@ -24,7 +24,7 @@ class _HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   // تهيئة الخدمات
-  final ItemService _itemService = ItemService();
+  final ReportService _itemService = ReportService();
   final AuthenticationService _authService = AuthenticationService();
 
   String userName = "زائر";
@@ -79,7 +79,7 @@ class _HomePageState extends State<HomePage> {
                           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                           : StreamBuilder<List<Report>>(
                         // الآن الـ Stream ما يفتح إلا والـ ID جاهز
-                        stream: _itemService.getMyReportsStream(currentUid),
+                        stream: _itemService.getUserReportsStream(currentUid),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: CircularProgressIndicator(color: AppColors.primary));

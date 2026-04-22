@@ -17,11 +17,11 @@ class MatchesPage extends StatefulWidget {
 class _MatchesPageState extends State<MatchesPage> {
   final Map<String, Report?> _reportCache = {};
 
-  final ItemService _service = ItemService();
+  final ReportService _service = ReportService();
 
   Future<Report?> _getReport(String id) async {
     if (!_reportCache.containsKey(id)) {
-      _reportCache[id] = await _service.getReportById(id);
+      _reportCache[id] = await _service.fetchReportById(id);
     }
     return _reportCache[id];
   }

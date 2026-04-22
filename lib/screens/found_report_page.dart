@@ -17,7 +17,7 @@ class FoundReportPage extends StatefulWidget {
 }
 
 class _FoundReportPageState extends State<FoundReportPage> {
-  final ItemService _itemService = ItemService();
+  final ReportService _itemService = ReportService();
   final AuthenticationService _authService = AuthenticationService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _typeController  = TextEditingController();
@@ -151,7 +151,7 @@ class _FoundReportPageState extends State<FoundReportPage> {
         createdAt: DateTime.now(),
       );
 
-      await _itemService.uploadReport(report, _selectedImage);
+      await _itemService.submitReport(report, _selectedImage);
 
       if (!mounted) return;
 
