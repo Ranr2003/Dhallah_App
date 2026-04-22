@@ -1,9 +1,7 @@
-import 'package:dhallah_app/utils/app_theme.dart';
+import 'package:dhallah_app/widgets/Wavy_Background.dart';
 import 'package:flutter/material.dart';
 // استيراد الخلفية الموحدة
-import '../widgets/Wavy_Background.dart';
 // استيراد ويدجت الزر
-//import '../widgets/custom_button1.dart';
 import '../widgets/custom_widgets.dart';
 
 class StartPage extends StatefulWidget {
@@ -75,16 +73,16 @@ class _StartPageState extends State<StartPage> {
                                   style: TextStyle(
                                     fontSize: screenWidth * 0.055,
                                     // لون متناسق مع ثيم الهوم (اللون البنفسجي الغامق)
-                                    color: AppColors.darkpurble,
+                                    color: const Color(0xFF5A4A75),
                                     fontWeight: FontWeight.bold,
-                                    fontFamily: 'Tajawal', // توحيد الخط مع الهوم
+                                    fontFamily: 'Cairo', // توحيد الخط مع الهوم
                                   ),
                                 ),
                               ),
                               const SizedBox(height: 50),
                               const Text(
                                 "إضغط في أي مكان للبدء",
-                                style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Tajawal'),
+                                style: TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'Cairo'),
                               ),
                             ],
                           ),
@@ -117,9 +115,9 @@ class _StartPageState extends State<StartPage> {
                                 child: const Text(
                                   "تخطي والدخول كضيف",
                                   style: TextStyle(
-                                    color: AppColors.primary, // لون بنفسجي فاتح للتخطي
+                                    color: Color(0xFFB293CD), // لون بنفسجي فاتح للتخطي
                                     fontSize: 14,
-                                    fontFamily: 'Tajawal',
+                                    fontFamily: 'Cairo',
                                     decoration: TextDecoration.underline,
                                   ),
                                 ),

@@ -77,29 +77,36 @@ class AdminService {
       'isBanned': isBanned, // تحتاجين إضافة هذا الحقل في الفايرستور لاحقاً
     });
   }
-  // حظر أو فك حظر مستخدم
-// حظر أو فك حظر مستخدم (تم تصحيح المسمى من _db إلى _firestore)
-  Future<void> toggleUserBan(String userId, bool currentStatus) async {
+// 4. حظر أو فك حظر مستخدم (تم دمجها في دالة واحدة احترافية)
+// 4. حظر أو فك حظر مستخدم (دالة موحدة ومعالجة للأخطاء)
+  Future<void> toggleUserBan(String userId, bool currentBanStatus) async {
     try {
-      // تم تغيير _db إلى _firestore ليتطابق مع تعريفك في الأعلى
+      // نحدث الحالة لعكس الحالة الحالية
       await _firestore.collection('users').doc(userId).update({
-        'isBanned': !currentStatus, // يعكس الحالة
+        'isBanned': !currentBanStatus,
       });
-      print("تم تحديث حالة الحظر في الفايربيس بنجاح لليوزر: $userId");
+      debugPrint("تم تحديث حالة المستخدم $userId إلى: ${!currentBanStatus}");
     } catch (e) {
-      print("خطأ أثناء تحديث الحظر: $e");
-      rethrow; // نرفع الخطأ لنراه في التطبيق
+      debugPrint("فشل تحديث حالة الحظر: $e");
+      rethrow;
     }
   }
-  // داخل ملف admin_serv.dart
+
+  // جلب المستخدمين مع ضمان وجود حقل الحظر حتى لو لم يكن موجوداً في الداتابيز
   Stream<List<Map<String, dynamic>>> getUsersWithDataStream() {
     return _firestore
         .collection('users')
         .where('userType', isEqualTo: 'regular')
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) {
-      Map<String, dynamic> data = doc.data(); // نحدد النوع هنا
+      Map<String, dynamic> data = doc.data();
       data['userId'] = doc.id;
+
+      // ✅ حماية إضافية: إذا الحقل مو موجود في الفايربيس، نعتبره false افتراضياً
+      if (!data.containsKey('isBanned')) {
+        data['isBanned'] = false;
+      }
+
       return data;
     }).toList());
   }

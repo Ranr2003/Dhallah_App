@@ -32,9 +32,82 @@ class _HomePageState extends State<HomePage> {
 
 
   @override
+  Widget _buildGuestEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // أيقونة تعبر عن الحساب أو الدخول
+          const SizedBox(height: 16),
+          const Text(
+            "سجل دخولك لتتمكن من\nإضافة ومتابعة بلاغاتك",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 18,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'Tajawal',
+            ),
+          ),
+          const SizedBox(height: 20),
+          // زر اختياري يوجهه لصفحة تسجيل الدخول
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (context) => const LoginPage()),
+                    (route) => false,
+              );
+            },
+            child: const Text(
+              "تسجيل الدخول الآن",
+              style: TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                decoration: TextDecoration.underline,
+                fontFamily: 'Tajawal',
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  // دالة لمراقبة حالة الحساب (هل تم حظره؟)
+  void _listenToAccountStatus() {
+    final user = _authService.getCurrentUser();
+    if (user != null) {
+      // مراقبة وثيقة المستخدم في Firestore بشكل مباشر
+      _dbService.getUserStream(user.uid).listen((userData) {
+        if (userData != null && userData.isBanned == true && mounted) {
+          _forceLogout(); // طرده فوراً
+        }
+      });
+    }
+  }
+
+// دالة تسجيل الخروج الإجباري والتحويل لصفحة الدخول
+  Future<void> _forceLogout() async {
+    await _authService.logout();
+    if (mounted) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const LoginPage()),
+            (route) => false,
+      );
+      // إظهار رسالة تنبيه
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("تم حظر حسابك لمخالفة السياسات، يرجى التواصل مع الدعم.",
+              textAlign: TextAlign.right,
+              style: TextStyle(fontFamily: 'Tajawal')),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
   void initState() {
     super.initState();
     _loadUserData();
+    _listenToAccountStatus(); // 👈 أضيفي هذا السطر هنا
   }
   final DatabaseService _dbService = DatabaseService();
   Future<void> _loadUserData() async {
@@ -52,8 +125,7 @@ class _HomePageState extends State<HomePage> {
       }
     }
   }
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildMainScaffold() {
     return Scaffold(
       key: _scaffoldKey,
       endDrawer: _buildSideMenu(context),
@@ -76,24 +148,19 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 20),
                     Expanded(
                       child: (currentUid.isEmpty)
-                          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                          ? _buildGuestEmptyState() // دالة جديدة للزائر
                           : StreamBuilder<List<Report>>(
-                        // الآن الـ Stream ما يفتح إلا والـ ID جاهز
                         stream: _itemService.getMyReportsStream(currentUid),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) {
                             return const Center(child: CircularProgressIndicator(color: AppColors.primary));
                           }
-
-                          // إذا السناب شوت فيه خطأ (مثلاً مشكلة في الصلاحيات)
                           if (snapshot.hasError) {
-                            return Center(child: Text("حدث خطأ في تحميل البيانات", style: TextStyle(fontFamily: 'Tajawal')));
+                            return const Center(child: Text("حدث خطأ في تحميل البيانات", style: TextStyle(fontFamily: 'Tajawal')));
                           }
-
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
                             return _buildEmptyState();
                           }
-
                           final myReports = snapshot.data!;
                           return ListView.builder(
                             padding: const EdgeInsets.only(bottom: 100),
@@ -107,17 +174,36 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            // استدعاء الودجت الموحد الجديد
-            // استدعاء الودجت الموحد الجديد في الهوم
-            CustomFloatingNavBar(
-              currentIndex: 1, // رقم 1 يمثل الهوم
-            ),
+            const CustomFloatingNavBar(currentIndex: 1),
           ],
         ),
       ),
     );
   }
+  @override
+  @override
+  Widget build(BuildContext context) {
+    // 1. إذا كان زائر (UID فارغ)، اعرضي الواجهة مباشرة بدون حارس الحظر
+    if (currentUid.isEmpty) {
+      return _buildMainScaffold();
+    }
 
+    // 2. إذا كان مستخدم مسجل، فعلي حارس الحظر
+    return StreamBuilder<dynamic>(
+      stream: _dbService.getUserStream(currentUid),
+      builder: (context, snapshot) {
+        // فحص الحظر
+        if (snapshot.hasData && snapshot.data != null) {
+          final userData = snapshot.data!.data() as Map<String, dynamic>?;
+          if (userData != null && userData['isBanned'] == true) {
+            Future.microtask(() => _forceLogout());
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+        }
+        return _buildMainScaffold();
+      },
+    );
+  }
   // --- دوال بناء الواجهة (نفس ستايلك القديم تماماً) ---
 
   Widget _buildTopBar() {
@@ -138,7 +224,13 @@ class _HomePageState extends State<HomePage> {
         Container(
           decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.2), borderRadius: BorderRadius.circular(20)),
           child: TextButton.icon(
-            onPressed: () => _openReportSheet(context),
+            onPressed: () {
+              if (currentUid.isEmpty) {
+                _showGuestWarning(context); // استخدام الرسالة الجميلة
+              } else {
+                _openReportSheet(context);
+              }
+            },
             icon: const Icon(Icons.add_circle_outline, color: AppColors.primaryDark),
             label: const Text("بلاغ جديد", style: TextStyle(color:AppColors.primaryDark, fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
           ),
@@ -450,6 +542,38 @@ class _HomePageState extends State<HomePage> {
               ),
          );
     }
+  }
+  void _showGuestWarning(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent, // شفاف عشان نستخدم الـ Container حقنا
+        elevation: 0,
+        content: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 3))
+            ],
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lock_outline, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "هذه الميزة متاحة للأعضاء فقط، سجل دخولك الآن!",
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontFamily: 'Tajawal', fontSize: 14, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
 }
