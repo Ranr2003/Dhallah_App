@@ -1,9 +1,12 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import '../models/report_model.dart';
+import '../services/database_serv.dart';
 import '../services/item_serv.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_widgets.dart';
+import 'messages_page.dart';
 
 class MatchesPage extends StatefulWidget {
   final List<dynamic> matches;
@@ -213,19 +216,59 @@ class _MatchesPageState extends State<MatchesPage> {
                                 WaterRippleButton(
                                   text: 'تواصل الآن',
                                   height: 40,
-                                  onTap: () {
-                                    //rasel
+                                  onTap: () async {
                                     final receiverId = report.userId;
                                     final senderId = widget.currentUid;
-                                    if (receiverId == "unknown") {
+
+                                    if (receiverId == "unknown" || receiverId == senderId) {
                                       ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text("عذراً، معرف المستخدم غير متوفر لهذا التقرير")),
+                                        const SnackBar(content: Text("لا يمكن بدء محادثة مع هذا المستخدم")),
                                       );
                                       return;
                                     }
-                                    print("ID المرسل: $senderId");
-                                    print("ID المستلم: $receiverId");
 
+                                    // 1. جلب بيانات المستخدم المستلم (صاحب البلاغ) من قاعدة البيانات
+                                    final DatabaseService _dbService = DatabaseService();
+                                    final receiverData = await _dbService.getUserById(receiverId);
+
+                                    // جلب اسم المستلم الحقيقي، وإذا لم يوجد نضع "مستخدم" كاحتياط
+                                    String displayName = receiverData?.name ?? "مستخدم";
+
+                                    // 2. إنشاء معرف الغرفة الفريد
+                                    List<String> ids = [senderId, receiverId];
+                                    ids.sort();
+                                    String chatRoomId = ids.join("_");
+
+                                    // 3. التحقق من الغرفة في Firestore أو إنشاؤها
+                                    final chatRoomRef = FirebaseFirestore.instance.collection('chat_rooms').doc(chatRoomId);
+                                    final doc = await chatRoomRef.get();
+
+                                    if (!doc.exists) {
+                                      await chatRoomRef.set({
+                                        'participants': ids,
+                                        'lastMessage': "",
+                                        'senderName': "مستخدم", // يمكن جلب اسم المرسل أيضاً بنفس الطريقة لو حابة
+                                        'receiverName': displayName,
+                                        'senderId': senderId,
+                                        'receiverId': receiverId,
+                                        'timestamp': FieldValue.serverTimestamp(),
+                                        'unreadCount': 0,
+                                      });
+                                    }
+
+                                    // 4. الانتقال لصفحة الرسائل بالاسم الحقيقي للمستخدم
+                                    if (mounted) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => MessagesPage(
+                                            userName: displayName, // سيظهر الآن اسم المستخدم الحقيقي (مثل رنيده) تلقائياً
+                                            receiverId: receiverId,
+                                            chatRoomId: chatRoomId,
+                                          ),
+                                        ),
+                                      );
+                                    }
                                   },
                                 )
 
