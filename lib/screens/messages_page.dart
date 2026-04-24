@@ -33,7 +33,7 @@ class _MessagesPageState extends State<MessagesPage> {
     _startRoomListener();
   }
 
-  // مستمع لإغلاق الصفحة فوراً إذا قام الطرف الآخر بحذف الغرفة
+  // مستمع لإغلاق الصفحة فوراً إذا قام أحد الطرفين بحذف الغرفة
   void _startRoomListener() {
     _roomListener = FirebaseFirestore.instance
         .collection('chat_rooms')
@@ -62,7 +62,6 @@ class _MessagesPageState extends State<MessagesPage> {
 
     final chatRef = FirebaseFirestore.instance.collection('chat_rooms').doc(widget.chatRoomId);
 
-    // تحديث بيانات الغرفة والعداد
     await chatRef.update({
       'lastMessage': msgText,
       'timestamp': FieldValue.serverTimestamp(),
@@ -70,7 +69,6 @@ class _MessagesPageState extends State<MessagesPage> {
       'lastSenderId': currentUserId,
     });
 
-    // إضافة الرسالة في الـ sub-collection
     await chatRef.collection('messages').add({
       'senderId': currentUserId,
       'message': msgText,
@@ -81,7 +79,6 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   void _showOptionsMenu() async {
-    // جلب بيانات الغرفة لمعرفة الـ reportIds
     DocumentSnapshot roomDoc = await FirebaseFirestore.instance
         .collection('chat_rooms')
         .doc(widget.chatRoomId)
@@ -95,15 +92,17 @@ class _MessagesPageState extends State<MessagesPage> {
     String? otherReportId = (currentUserId == roomData['senderId'])
         ? roomData['receiverreportId'] : roomData['senderreportId'];
 
-    String questionText = "";
+    String questionText = "هل تم حل المشكلة؟";
 
-    // تحديد نص السؤال بناءً على نوع البلاغ (مفقود/موجود)
     if (myReportId != null && myReportId.isNotEmpty) {
       DocumentSnapshot reportDoc = await FirebaseFirestore.instance.collection('reports').doc(myReportId).get();
       if (reportDoc.exists) {
         String type = reportDoc['type'] ?? '';
-        if (type == 'lost') {questionText = "هل وجدت غرضك المفقود؟";}
-        else if (type == 'found') {questionText = "هل وجدت صاحب الغرض؟";}
+        if (type == 'lost') {
+          questionText = "هل هذا هو غرضك المفقود؟";
+        } else if (type == 'found') {
+          questionText = "هل هذا هو صاحب الغرض؟";
+        }
       }
     }
 
@@ -119,24 +118,42 @@ class _MessagesPageState extends State<MessagesPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(questionText, textAlign: TextAlign.center,
-                style: const TextStyle(fontFamily: 'Tajawal', fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF5A4A75))),
+            Text(
+              questionText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF5A4A75),
+              ),
+            ),
             const SizedBox(height: 24),
             Row(
               children: [
-                Expanded(child: ElevatedButton(
+                // خيار لا: يحذف المحادثة فقط ويترك الحالة مفتوحة
+                Expanded(
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[200]),
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text("ليس بعد", style: TextStyle(color: Colors.black54)))),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _terminateConversation(myReportId, otherReportId, shouldCloseStatus: false);
+                    },
+                    child: const Text("لا", style: TextStyle(color: Colors.black54)),
+                  ),
+                ),
                 const SizedBox(width: 12),
-                Expanded(child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor:  AppColors.primary),
-                  onPressed: () {
-                    Navigator.pop(ctx);
-                    _terminateConversation(myReportId, otherReportId);
-                  },
-                  child: const Text("نعم", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                )),
+                // خيار نعم: يغلق الحالة ويحذف المحادثة
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _terminateConversation(myReportId, otherReportId, shouldCloseStatus: true);
+                    },
+                    child: const Text("نعم", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                  ),
+                ),
               ],
             ),
           ],
@@ -145,35 +162,35 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
-  // ✅ الدالة المسؤولة عن الحذف الكامل وتنظيف الفايربيس
-  void _terminateConversation(String? myReportId, String? otherReportId) async {
+  // الدالة المسؤولة عن التنفيذ بناءً على قرار المستخدم
+  void _terminateConversation(String? myReportId, String? otherReportId, {required bool shouldCloseStatus}) async {
     try {
       final chatRef = FirebaseFirestore.instance.collection('chat_rooms').doc(widget.chatRoomId);
 
-      // جلب كافة الرسائل لحذفها (تنظيف الـ Sub-collection)
+      // 1. جلب الرسائل لحذفها
       var messagesSnapshot = await chatRef.collection('messages').get();
-
       WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      // إضافة حذف الرسائل للـ Batch
       for (var doc in messagesSnapshot.docs) {
         batch.delete(doc.reference);
       }
 
-      // إغلاق البلاغات في الفايربيس
-      if (myReportId != null) {
-        batch.update(FirebaseFirestore.instance.collection('reports').doc(myReportId), {'status': 'closed'});
-      }
-      if (otherReportId != null) {
-        batch.update(FirebaseFirestore.instance.collection('reports').doc(otherReportId), {'status': 'closed'});
+      // 2. إذا اختار "نعم" (إغلاق الحالة)
+      if (shouldCloseStatus) {
+        if (myReportId != null) {
+          batch.update(FirebaseFirestore.instance.collection('reports').doc(myReportId), {'status': 'closed'});
+        }
+        if (otherReportId != null) {
+          batch.update(FirebaseFirestore.instance.collection('reports').doc(otherReportId), {'status': 'closed'});
+        }
       }
 
-      // حذف وثيقة الغرفة نهائياً
+      // 3. حذف غرفة المحادثة نهائياً (تحدث في الحالتين)
       batch.delete(chatRef);
 
-      // تنفيذ العمليات دفعة واحدة
       await batch.commit();
 
+      // ملاحظة: الـ Listener سيقوم بإخراج المستخدم من الصفحة تلقائياً
     } catch (e) {
       debugPrint("Error terminating chat: $e");
     }
@@ -182,7 +199,6 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // التنسيق القديم: خلفية متدرجة
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -222,7 +238,9 @@ class _MessagesPageState extends State<MessagesPage> {
                     .orderBy('timestamp', descending: false)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text("لا توجد رسائل"));
+
                   final messages = snapshot.data!.docs;
                   return ListView.builder(
                     padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
