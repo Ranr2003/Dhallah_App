@@ -60,7 +60,9 @@ class _MessagesPageState extends State<MessagesPage> {
     String msgText = messageController.text.trim();
     if (msgText.isEmpty) return;
 
-    final chatRef = FirebaseFirestore.instance.collection('chat_rooms').doc(widget.chatRoomId);
+    final chatRef = FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .doc(widget.chatRoomId);
 
     await chatRef.update({
       'lastMessage': msgText,
@@ -88,20 +90,25 @@ class _MessagesPageState extends State<MessagesPage> {
     var roomData = roomDoc.data() as Map<String, dynamic>;
 
     String? myReportId = (currentUserId == roomData['senderId'])
-        ? roomData['senderreportId'] : roomData['receiverreportId'];
+        ? roomData['senderreportId']
+        : roomData['receiverreportId'];
     String? otherReportId = (currentUserId == roomData['senderId'])
-        ? roomData['receiverreportId'] : roomData['senderreportId'];
+        ? roomData['receiverreportId']
+        : roomData['senderreportId'];
 
     String questionText = "هل تم حل المشكلة؟";
 
     if (myReportId != null && myReportId.isNotEmpty) {
-      DocumentSnapshot reportDoc = await FirebaseFirestore.instance.collection('reports').doc(myReportId).get();
+      DocumentSnapshot reportDoc = await FirebaseFirestore.instance
+          .collection('reports')
+          .doc(myReportId)
+          .get();
       if (reportDoc.exists) {
         String type = reportDoc['type'] ?? '';
         if (type == 'lost') {
-          questionText = "هل هذا هو غرضك المفقود؟";
+          questionText = "هل عثرت على غرضك؟";
         } else if (type == 'found') {
-          questionText = "هل هذا هو صاحب الغرض؟";
+          questionText = "هل وجدت صاحب الغرض؟";
         }
       }
     }
@@ -114,7 +121,8 @@ class _MessagesPageState extends State<MessagesPage> {
       builder: (ctx) => Container(
         margin: const EdgeInsets.all(16),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+        decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(24)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -125,33 +133,38 @@ class _MessagesPageState extends State<MessagesPage> {
                 fontFamily: 'Tajawal',
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF5A4A75),
+                color:Color(0xFF5A4A75),
               ),
             ),
             const SizedBox(height: 24),
             Row(
               children: [
-                // خيار لا: يحذف المحادثة فقط ويترك الحالة مفتوحة
                 Expanded(
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[200]),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[200]),
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _terminateConversation(myReportId, otherReportId, shouldCloseStatus: false);
+                      _terminateConversation(myReportId, otherReportId,
+                          shouldCloseStatus: false);
                     },
-                    child: const Text("لا", style: TextStyle(color: Colors.black54)),
+                    child: const Text("لا",
+                        style: TextStyle(color: Colors.black54)),
                   ),
                 ),
                 const SizedBox(width: 12),
-                // خيار نعم: يغلق الحالة ويحذف المحادثة
                 Expanded(
                   child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: Color(0xFF5A4A75)),
                     onPressed: () {
                       Navigator.pop(ctx);
-                      _terminateConversation(myReportId, otherReportId, shouldCloseStatus: true);
+                      _showCloseConfirmationDialog(myReportId, otherReportId);
                     },
-                    child: const Text("نعم", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: const Text("نعم",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold)),
                   ),
                 ),
               ],
@@ -162,10 +175,105 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
+  // رسالة تنبيهية تأكيدية قبل إغلاق البلاغ وإنهاء المحادثة
+  void _showCloseConfirmationDialog(
+      String? myReportId, String? otherReportId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        shape:
+        RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Colors.white,
+        icon: const Icon(
+          Icons.check_circle_outline,
+          color: Color(0xFF5A4A75),
+          size: 52,
+        ),
+        title: const Text(
+          "تأكيد الإغلاق",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'Tajawal',
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+            color: Color(0xFF5A4A75),
+          ),
+        ),
+        content: const Text(
+          "سيتم إغلاق البلاغ وإنهاء المحادثة نهائياً.\nهل أنت متأكد من المتابعة؟",
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontFamily: 'Tajawal',
+            fontSize: 15,
+            color: Colors.black54,
+            height: 1.6,
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        actions: [
+          Row(
+            children: [
+              // زر إلغاء
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF5A4A75)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () => Navigator.pop(dialogCtx),
+                  child: const Text(
+                    "إلغاء",
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      color: Color(0xFF5A4A75),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // زر تأكيد الإغلاق
+              Expanded(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF5A4A75),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () {
+                    Navigator.pop(dialogCtx);
+                    _terminateConversation(myReportId, otherReportId,
+                        shouldCloseStatus: true);
+                  },
+                  child: const Text(
+                    "تأكيد",
+                    style: TextStyle(
+                      fontFamily: 'Tajawal',
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // الدالة المسؤولة عن التنفيذ بناءً على قرار المستخدم
-  void _terminateConversation(String? myReportId, String? otherReportId, {required bool shouldCloseStatus}) async {
+  void _terminateConversation(String? myReportId, String? otherReportId,
+      {required bool shouldCloseStatus}) async {
     try {
-      final chatRef = FirebaseFirestore.instance.collection('chat_rooms').doc(widget.chatRoomId);
+      final chatRef = FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(widget.chatRoomId);
 
       // 1. جلب الرسائل لحذفها
       var messagesSnapshot = await chatRef.collection('messages').get();
@@ -175,13 +283,21 @@ class _MessagesPageState extends State<MessagesPage> {
         batch.delete(doc.reference);
       }
 
-      // 2. إذا اختار "نعم" (إغلاق الحالة)
+      // 2. إذا اختار "تأكيد" (إغلاق الحالة)
       if (shouldCloseStatus) {
         if (myReportId != null) {
-          batch.update(FirebaseFirestore.instance.collection('reports').doc(myReportId), {'status': 'closed'});
+          batch.update(
+              FirebaseFirestore.instance
+                  .collection('reports')
+                  .doc(myReportId),
+              {'status': 'closed'});
         }
         if (otherReportId != null) {
-          batch.update(FirebaseFirestore.instance.collection('reports').doc(otherReportId), {'status': 'closed'});
+          batch.update(
+              FirebaseFirestore.instance
+                  .collection('reports')
+                  .doc(otherReportId),
+              {'status': 'closed'});
         }
       }
 
@@ -212,22 +328,34 @@ class _MessagesPageState extends State<MessagesPage> {
           backgroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF5A4A75)),
+            icon:
+            const Icon(Icons.arrow_back_ios, color: Color(0xFF5A4A75)),
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(widget.userName,
-              style: const TextStyle(color: Color(0xFF5A4A75), fontWeight: FontWeight.bold, fontFamily: 'Tajawal')),
+              style: const TextStyle(
+                  color: Color(0xFF5A4A75),
+                  fontWeight: FontWeight.bold,
+                  fontFamily: 'Tajawal')),
           centerTitle: true,
           actions: [
-            IconButton(icon: const Icon(Icons.more_vert, color: Color(0xFF5A4A75)), onPressed: _showOptionsMenu),
+            IconButton(
+                icon: const Icon(Icons.more_vert, color: Color(0xFF5A4A75)),
+                onPressed: _showOptionsMenu),
           ],
         ),
         body: Column(
           children: [
             const SizedBox(height: 10),
-            Center(child: ChatAvatar(imageUrl: 'https://via.placeholder.com/150')),
+            Center(
+                child: ChatAvatar(
+                    imageUrl: 'https://via.placeholder.com/150')),
             const SizedBox(height: 10),
-            Text(widget.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: Color(0xFF5A4A75))),
+            Text(widget.userName,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFF5A4A75))),
             const SizedBox(height: 20),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
@@ -238,17 +366,26 @@ class _MessagesPageState extends State<MessagesPage> {
                     .orderBy('timestamp', descending: false)
                     .snapshots(),
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
-                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const Center(child: Text("لا توجد رسائل"));
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(child: Text("لا توجد رسائل"));
+                  }
 
                   final messages = snapshot.data!.docs;
                   return ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 15, vertical: 10),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
-                      var data = messages[index].data() as Map<String, dynamic>;
-                      DateTime? date = (data['timestamp'] as Timestamp?)?.toDate();
-                      String time = date != null ? "${date.hour}:${date.minute.toString().padLeft(2, '0')}" : "";
+                      var data =
+                      messages[index].data() as Map<String, dynamic>;
+                      DateTime? date =
+                      (data['timestamp'] as Timestamp?)?.toDate();
+                      String time = date != null
+                          ? "${date.hour}:${date.minute.toString().padLeft(2, '0')}"
+                          : "";
 
                       return ChatBubble(
                         message: data['message'] ?? "",
@@ -260,7 +397,8 @@ class _MessagesPageState extends State<MessagesPage> {
                 },
               ),
             ),
-            ChatInputField(controller: messageController, onSend: sendMessage),
+            ChatInputField(
+                controller: messageController, onSend: sendMessage),
             const SizedBox(height: 10),
           ],
         ),
