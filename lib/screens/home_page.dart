@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import '../models/notification_model.dart';
 import '../services/item_serv.dart';
 import '../services/authentication_serv.dart';
 import '../models/report_model.dart';
+import '../services/notification_serv.dart';
 import '../widgets/Wavy_Background.dart';
 import 'login_page.dart';
 import 'lost_report_page.dart';
@@ -12,6 +14,7 @@ import '../widgets/custom_widgets.dart';
 import '../utils/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'matches_page.dart';
+import 'notifications_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -207,12 +210,60 @@ class _HomePageState extends State<HomePage> {
   // --- دوال بناء الواجهة (نفس ستايلك القديم تماماً) ---
 
   Widget _buildTopBar() {
+    final NotificationService _notificationService = NotificationService();
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        IconButton(icon: const Icon(Icons.notifications_none_rounded, size: 30, color: AppColors.primaryDark), onPressed: () {}),
-        Image.asset('resourses/DallahAppLogo2.png', height: 45, errorBuilder: (context, error, stackTrace) => const Icon(Icons.apps)),
-        IconButton(icon: const Icon(Icons.menu_rounded, size: 30, color: AppColors.primaryDark), onPressed: () => _scaffoldKey.currentState?.openEndDrawer()),
+        // زر الجرس مع الربط والنقطة الحمراء
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none_rounded, size: 30, color: AppColors.primaryDark),
+              onPressed: () {
+                if (currentUid.isEmpty) {
+                  _showGuestWarning(context); // تنبيه الزائر
+                } else {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const NotificationsPage()),
+                  );
+                }
+              },
+            ),
+            // النقطة الحمراء الذكية للمسجلين فقط
+            if (currentUid.isNotEmpty)
+              StreamBuilder<List<NotificationModel>>(
+                stream: _notificationService.getNotifications(currentUid),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data!.any((n) => !n.isRead)) {
+                    return Positioned(
+                      right: 8,
+                      top: 8,
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+          ],
+        ),
+
+        Image.asset('resourses/DallahAppLogo2.png', height: 45,
+            errorBuilder: (context, error, stackTrace) => const Icon(Icons.apps)),
+
+        IconButton(
+            icon: const Icon(Icons.menu_rounded, size: 30, color: AppColors.primaryDark),
+            onPressed: () => _scaffoldKey.currentState?.openEndDrawer()
+        ),
       ],
     );
   }
@@ -509,9 +560,51 @@ class _HomePageState extends State<HomePage> {
                                        isRtl: true,
                                       color:AppColors.textSecondary,
                                    ),const SizedBox(height: 25),
-                                    WaterRippleButton(
-                                       text: 'عرض التطابق الذكي',
-                                       icon: Icons.psychology,
+                                   // فحص حالة البلاغ لعرض الزر المناسب
+// 1. حالة: تم العثور على تطابقات (إرسال إشعار تطابق تلقائي + عرض الزر)
+                         if (report.ai_status == 'completed' && report.matches.isNotEmpty)
+                           Builder(
+                             builder: (context) {
+                               // إرسال إشعار "تم العثور على تطابق" تلقائياً بمجرد ظهور النتيجة
+                               WidgetsBinding.instance.addPostFrameCallback((_) {
+                                 NotificationService().sendNotification(
+                                   receiverId: currentUid,
+                                   title: "تم العثور على تطابق ✨",
+                                   body: "أخبار جيدة! وجدنا نتائج تطابق بلاغك عن (${report.item.category})",
+                                   type: "match",
+                                   reportId: report.reportId, // ✅ تم التعديل هنا ليكون كائن البلاغ . المعرف // يفضل تمريره لضمان عدم تكرار الإشعار في الفايربيس
+                                 );
+                               });
+
+                               return WaterRippleButton(
+                                 text: 'تم العثور على تطابق ✨',
+                                 icon: Icons.auto_awesome,
+                                 onTap: () => _onMatchButtonTapped(report),
+                               );
+                             },
+                           )
+                                   else if (report.ai_status == 'completed' && report.matches.isEmpty)
+                                     Builder(
+                                       builder: (context) {
+                                         // إرسال إشعار "جارِ المطابقة" تلقائياً
+                                         WidgetsBinding.instance.addPostFrameCallback((_) {
+                                           NotificationService().sendNotification(
+                                             receiverId: currentUid, // تأكدي أن currentUid معرف في الكلاس
+                                             title: "جارِ المطابقة",
+                                             body: "نظام دله يراقب بلاغك ${report.item.category}، سيتم إشعارك فور توفر مطابقات.",
+                                             type: "processing",
+                                           );
+                                         });
+                                         return const Text(
+                                           "لم يتم العثور على مطابقات حالياً",
+                                           style: TextStyle(fontFamily: 'Tajawal', color: Colors.grey, fontSize: 14),
+                                         );
+                                       },
+                                     )
+                                   else
+                                     WaterRippleButton(
+                                       text: 'جارِ المطابقة... 🔍',
+                                       icon: Icons.hourglass_empty_rounded,
                                        onTap: () => _onMatchButtonTapped(report),
                                      ),
                        ],
@@ -519,28 +612,31 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+
+// داخل _onMatchButtonTapped في الهوم بيج
   void _onMatchButtonTapped(Report report) {
-    if (report.ai_status == 'completed') {
-         Navigator.push(
-             context,
-             MaterialPageRoute(
-                 builder: (context) => MatchesPage(matches: report.matches,currentUid: currentUid,),
-             ),
-         );
+    if (report.ai_status == 'completed' && report.matches.isNotEmpty) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => MatchesPage(
+            matches: report.matches,
+            currentUid: currentUid,
+          ),
+        ),
+      );
     } else {
-        String message = report.ai_status == 'error' ? 'حدث خطأ في المعالجة' : '... جاري تحليل الصور والنصوص للمطابقة ';
-        Color snackColor = report.ai_status == 'error' ? Colors.red : Colors.orange;
-         ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                 content: Text(message,
-                     textAlign: TextAlign.right,
-                     style: const TextStyle(
-                         fontFamily: 'Tajawal'
-                     )
-                 ),
-                 backgroundColor: snackColor,
-              ),
-         );
+      // إظهار رسالة تنبيهية للمستخدم فقط دون إرسال إشعار للفايربيس
+      String snackMessage = (report.ai_status == 'completed' && report.matches.isEmpty)
+          ? "لم نجد مطابقات حالياً، سنشعرك فور العثور على شيء"
+          : "جاري تحليل البيانات للمطابقة.. يرجى الانتظار";
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(snackMessage, textAlign: TextAlign.right, style: const TextStyle(fontFamily: 'Tajawal')),
+          backgroundColor: AppColors.primary,
+        ),
+      );
     }
   }
   void _showGuestWarning(BuildContext context) {
