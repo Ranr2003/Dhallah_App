@@ -451,14 +451,26 @@ class _HomePageState extends State<HomePage> {
     if (report.ai_status == 'completed') {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => MatchesPage(matches: report.matches, currentUid: currentUid)),
+        MaterialPageRoute(
+          builder: (context) => MatchesPage(
+            matches: report.matches,
+            currentUid: currentUid,
+            reportId: report.reportId ?? "", // ✅ أضيفي هذا السطر فقط
+          ),
+        ),
       );
     } else {
-      String message = report.ai_status == 'error' ? 'حدث خطأ في المعالجة' : '... جاري تحليل الصور والنصوص للمطابقة ';
+      String message = report.ai_status == 'error'
+          ? 'حدث خطأ في المعالجة'
+          : '... جاري تحليل الصور والنصوص للمطابقة ';
       Color snackColor = report.ai_status == 'error' ? Colors.red : Colors.orange;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(message, textAlign: TextAlign.right, style: const TextStyle(fontFamily: 'Tajawal')),
+          content: Text(
+            message,
+            textAlign: TextAlign.right,
+            style: const TextStyle(fontFamily: 'Tajawal'),
+          ),
           backgroundColor: snackColor,
         ),
       );
