@@ -33,7 +33,6 @@ class _MessagesPageState extends State<MessagesPage> {
     _startRoomListener();
   }
 
-  // مستمع لإغلاق الصفحة فوراً إذا قام أحد الطرفين بحذف الغرفة
   void _startRoomListener() {
     _roomListener = FirebaseFirestore.instance
         .collection('chat_rooms')
@@ -96,23 +95,6 @@ class _MessagesPageState extends State<MessagesPage> {
         ? roomData['receiverreportId']
         : roomData['senderreportId'];
 
-    String questionText = "هل تم حل المشكلة؟";
-
-    if (myReportId != null && myReportId.isNotEmpty) {
-      DocumentSnapshot reportDoc = await FirebaseFirestore.instance
-          .collection('reports')
-          .doc(myReportId)
-          .get();
-      if (reportDoc.exists) {
-        String type = reportDoc['type'] ?? '';
-        if (type == 'lost') {
-          questionText = "هل عثرت على غرضك؟";
-        } else if (type == 'found') {
-          questionText = "هل وجدت صاحب الغرض؟";
-        }
-      }
-    }
-
     if (!mounted) return;
 
     showModalBottomSheet(
@@ -126,14 +108,14 @@ class _MessagesPageState extends State<MessagesPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              questionText,
+            const Text(
+              "هل عثرت على غرضك؟",
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'Tajawal',
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color:Color(0xFF5A4A75),
+                color: Color(0xFF5A4A75),
               ),
             ),
             const SizedBox(height: 24),
@@ -175,7 +157,6 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
-  // رسالة تنبيهية تأكيدية قبل إغلاق البلاغ وإنهاء المحادثة
   void _showCloseConfirmationDialog(
       String? myReportId, String? otherReportId) {
     showDialog(
@@ -215,7 +196,6 @@ class _MessagesPageState extends State<MessagesPage> {
         actions: [
           Row(
             children: [
-              // زر إلغاء
               Expanded(
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
@@ -236,7 +216,6 @@ class _MessagesPageState extends State<MessagesPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              // زر تأكيد الإغلاق
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
@@ -267,7 +246,6 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
-  // الدالة المسؤولة عن التنفيذ بناءً على قرار المستخدم
   void _terminateConversation(String? myReportId, String? otherReportId,
       {required bool shouldCloseStatus}) async {
     try {
@@ -275,7 +253,6 @@ class _MessagesPageState extends State<MessagesPage> {
           .collection('chat_rooms')
           .doc(widget.chatRoomId);
 
-      // 1. جلب الرسائل لحذفها
       var messagesSnapshot = await chatRef.collection('messages').get();
       WriteBatch batch = FirebaseFirestore.instance.batch();
 
@@ -283,7 +260,6 @@ class _MessagesPageState extends State<MessagesPage> {
         batch.delete(doc.reference);
       }
 
-      // 2. إذا اختار "تأكيد" (إغلاق الحالة)
       if (shouldCloseStatus) {
         if (myReportId != null) {
           batch.update(
@@ -301,14 +277,40 @@ class _MessagesPageState extends State<MessagesPage> {
         }
       }
 
-      // 3. حذف غرفة المحادثة نهائياً (تحدث في الحالتين)
       batch.delete(chatRef);
-
       await batch.commit();
-
-      // ملاحظة: الـ Listener سيقوم بإخراج المستخدم من الصفحة تلقائياً
     } catch (e) {
       debugPrint("Error terminating chat: $e");
+    }
+  }
+
+  // ✅ دالة مستقلة لجلب نوع بلاغ المستخدم الحالي
+  Future<String?> _getMyReportType() async {
+    try {
+      DocumentSnapshot roomDoc = await FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(widget.chatRoomId)
+          .get();
+
+      if (!roomDoc.exists) return null;
+      var roomData = roomDoc.data() as Map<String, dynamic>;
+
+      String? myReportId = (currentUserId == roomData['senderId'])
+          ? roomData['senderreportId']
+          : roomData['receiverreportId'];
+
+      if (myReportId == null || myReportId.isEmpty) return null;
+
+      DocumentSnapshot reportDoc = await FirebaseFirestore.instance
+          .collection('reports')
+          .doc(myReportId)
+          .get();
+
+      if (!reportDoc.exists) return null;
+      return reportDoc['type'] as String?;
+    } catch (e) {
+      debugPrint("Error getting report type: $e");
+      return null;
     }
   }
 
@@ -328,20 +330,35 @@ class _MessagesPageState extends State<MessagesPage> {
           backgroundColor: Colors.white,
           elevation: 0,
           leading: IconButton(
-            icon:
-            const Icon(Icons.arrow_back_ios, color: Color(0xFF5A4A75)),
+            icon: const Icon(Icons.arrow_back_ios, color: Color(0xFF5A4A75)),
             onPressed: () => Navigator.pop(context),
           ),
-          title: Text(widget.userName,
-              style: const TextStyle(
-                  color: Color(0xFF5A4A75),
-                  fontWeight: FontWeight.bold,
-                  fontFamily: 'Tajawal')),
+          title: Text(
+            widget.userName,
+            style: const TextStyle(
+              color: Color(0xFF5A4A75),
+              fontWeight: FontWeight.bold,
+              fontFamily: 'Tajawal',
+            ),
+          ),
           centerTitle: true,
           actions: [
-            IconButton(
-                icon: const Icon(Icons.more_vert, color: Color(0xFF5A4A75)),
-                onPressed: _showOptionsMenu),
+            // ✅ الزر يظهر فقط لصاحب بلاغ المفقود (lost)
+            FutureBuilder<String?>(
+              future: _getMyReportType(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const SizedBox.shrink();
+                final String? type = snapshot.data;
+
+                // إخفاء الزر إذا لم يكن النوع (lost)
+                if (type != 'lost') return const SizedBox.shrink();
+
+                return IconButton(
+                  icon: const Icon(Icons.more_vert, color: Color(0xFF5A4A75)),
+                  onPressed: _showOptionsMenu,
+                );
+              },
+            ),
           ],
         ),
         body: Column(
@@ -351,11 +368,14 @@ class _MessagesPageState extends State<MessagesPage> {
                 child: ChatAvatar(
                     imageUrl: 'https://via.placeholder.com/150')),
             const SizedBox(height: 10),
-            Text(widget.userName,
-                style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: Color(0xFF5A4A75))),
+            Text(
+              widget.userName,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: Color(0xFF5A4A75),
+              ),
+            ),
             const SizedBox(height: 20),
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
