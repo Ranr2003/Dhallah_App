@@ -1,24 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../utils/app_theme.dart';
-import '../widgets/custom_widgets.dart';
+import '../widgets/custom_widgets.dart'; // تأكدي أن MessageTile موجود هنا
 import '../widgets/Wavy_Background.dart';
-import 'account_info_page.dart';
 import 'messages_page.dart';
 
 class ChatListPage extends StatelessWidget {
   const ChatListPage({super.key});
 
   @override
-  @override
   Widget build(BuildContext context) {
-    // 1. الحصول على الـ UID الخاص بكِ من الفايربيس للفلترة
+    // 1. الحصول على الـ UID الخاص بكِ للفلترة
     final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
     return Scaffold(
-      // تغليف الصفحة بالخلفية الموحدة
       body: WavyBackground(
         child: Stack(
           children: [
@@ -39,6 +34,7 @@ class ChatListPage extends StatelessWidget {
 
                   Expanded(
                     child: StreamBuilder<QuerySnapshot>(
+                      // جلب الغرف التي تشاركين فيها مرتبة حسب وقت آخر رسالة
                       stream: FirebaseFirestore.instance
                           .collection('chat_rooms')
                           .where('participants', arrayContains: myUid)
@@ -69,23 +65,32 @@ class ChatListPage extends StatelessWidget {
                             var room = rooms[index].data() as Map<String, dynamic>;
                             String chatRoomId = rooms[index].id;
 
+                            // استخراج بيانات الرسالة الأخيرة
                             String lastMsg = room['lastMessage'] ?? "";
-                            String senderId = room['senderId'] ?? "";
-                            String receiverId = room['receiverId'] ?? "";
-                            String senderName = room['senderName'] ?? "مستخدم";
-                            String receiverName = room['receiverName'] ?? "مستخدم";
                             String lastSenderId = room['lastSenderId'] ?? "";
 
-                            // منطق تحديد الاسم المراد عرضه
+                            // تحديد الـ ID والاسم للطرف الآخر ديناميكياً
+                            List participants = room['participants'] ?? [];
+                            String otherUserId = participants.firstWhere(
+                                    (id) => id != myUid,
+                                orElse: () => ""
+                            );
+
                             String displayUsername;
-                            if (myUid == receiverId) {
-                              displayUsername = senderName;
+                            if (myUid == room['receiverId']) {
+                              displayUsername = room['senderName'] ?? "مستخدم";
                             } else {
-                              displayUsername = receiverName;
+                              displayUsername = room['receiverName'] ?? "مستخدم";
                             }
 
-                            // معالجة عداد الرسائل غير المقروءة
-                            int unreadCount = room['unreadCount'] ?? 0;
+                            // معالجة عداد الرسائل (التأكد من أنه رقم صحيح)
+                            int unreadCount = 0;
+                            if (room['unreadCount'] != null) {
+                              unreadCount = (room['unreadCount'] as num).toInt();
+                            }
+
+                            // منطق ظهور النقطة البنفسجية
+                            // تظهر فقط إذا كان العداد > 0 وأنتِ لستِ من أرسل الرسالة الأخيرة
                             String? countString = (unreadCount > 0 && lastSenderId != myUid)
                                 ? unreadCount.toString()
                                 : null;
@@ -95,18 +100,21 @@ class ChatListPage extends StatelessWidget {
                               message: lastMsg,
                               count: countString,
                               onTap: () async {
-                                // تصفير العداد عند الدخول للمحادثة
+                                // 1. تصفير العداد فوراً عند النقر للدخول
                                 await FirebaseFirestore.instance
                                     .collection('chat_rooms')
                                     .doc(chatRoomId)
                                     .update({'unreadCount': 0});
 
+                                if (!context.mounted) return;
+
+                                // 2. الانتقال لصفحة المحادثة
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
                                     builder: (context) => MessagesPage(
                                       userName: displayUsername,
-                                      receiverId: (myUid == receiverId) ? senderId : receiverId,
+                                      receiverId: otherUserId,
                                       chatRoomId: chatRoomId,
                                     ),
                                   ),
@@ -122,7 +130,7 @@ class ChatListPage extends StatelessWidget {
               ),
             ),
 
-            // شريط التنقل العائم (يظهر فوق الـ SafeArea)
+            // شريط التنقل العائم
             _buildFloatingNavBar(context),
           ],
         ),
@@ -130,7 +138,6 @@ class ChatListPage extends StatelessWidget {
     );
   }
 
-  // دالة بناء شريط التنقل بنفس تصميم الصفحة الرئيسية
   Widget _buildFloatingNavBar(BuildContext context) {
     return Positioned(
       left: 25,
@@ -152,37 +159,18 @@ class ChatListPage extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            // 1. أيقونة الرسائل - أصبحت هي النشطة الآن
             _buildActiveChatIcon(),
-
-            // 2. أيقونة الهوم - أصبحت عادية وتنقلك للرئيسية
             InkWell(
-              onTap: () {
-                Navigator.pushReplacementNamed(context, '/home');
-              },
-              child: const Icon(
-                Icons.home_outlined,
-                color: Color(0xFFB293CD),
-                size: 28,
-              ),
+              onTap: () => Navigator.pushReplacementNamed(context, '/home'),
+              child: const Icon(Icons.home_outlined, color: Color(0xFFB293CD), size: 28),
             ),
-
-            // 3. أيقونة البروفايل
-            InkWell(
-              //onTap: _navigateToProfile,
-              child: const Icon(
-                Icons.person_outline_rounded,
-                color: Color(0xFFB293CD),
-                size: 28,
-              ),
-            ),
+            const Icon(Icons.person_outline_rounded, color: Color(0xFFB293CD), size: 28),
           ],
         ),
       ),
     );
   }
 
-// دالة بناء أيقونة الرسائل النشطة (بنفس ستايل الهوم في الرئيسية)
   Widget _buildActiveChatIcon() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8),
@@ -191,8 +179,8 @@ class ChatListPage extends StatelessWidget {
         borderRadius: BorderRadius.circular(15),
       ),
       child: const Icon(
-        Icons.chat_bubble_rounded, // أيقونة ممتلئة (نشطة)
-        color: Color(0xFF5A4A75),   // اللون الغامق
+        Icons.chat_bubble_rounded,
+        color: Color(0xFF5A4A75),
         size: 26,
       ),
     );

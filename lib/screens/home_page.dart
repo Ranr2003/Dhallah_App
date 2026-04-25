@@ -1,6 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart'; // أضيفي هذا السطر
 
 // Imports (تأكدي من مطابقة المسارات لمجلدات مشروعك)
 import '../services/item_serv.dart';
@@ -18,6 +21,16 @@ import 'lost_report_page.dart';
 import 'found_report_page.dart';
 import 'notifications_page.dart';
 import 'matches_page.dart';
+
+// تعريف قناة الإشعارات للأندرويد لضمان الظهور من الأعلى (Heads-up)
+const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  'high_importance_channel',
+  'إشعارات دلة الهامة',
+  description: 'هذه القناة تستخدم لإشعارات الدردشة والمطابقة',
+  importance: Importance.max,
+);
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -39,9 +52,70 @@ class _HomePageState extends State<HomePage> {
   String currentUid = "";
 
   @override
+  @override
   void initState() {
     super.initState();
     _loadUserData();
+    _setupToken();
+    _setupForegroundNotifications(); // نداء الدالة الجديدة هنا
+  }
+
+
+  void _setupForegroundNotifications() async {
+    // 1. إعدادات الأندرويد للأيقونة
+    const AndroidInitializationSettings initializationSettingsAndroid =
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings =
+    InitializationSettings(android: initializationSettingsAndroid);
+
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    // 2. الاستماع للرسائل
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+
+      if (notification != null && android != null) {
+        // فقط إظهار النافذة المنبثقة
+        flutterLocalNotificationsPlugin.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              channel.id,
+              channel.name,
+              channelDescription: channel.description,
+              importance: Importance.max,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+            ),
+          ),
+        );
+      }
+    });
+  }
+  void _setupToken() async {
+    // 1. جلب التوكن الخاص بالجهاز
+    String? token = await FirebaseMessaging.instance.getToken();
+
+    // 2. طباعته في الكونسول لكي تنسخيه وتجربي به
+    print("------- My Device Token -------");
+    print(token);
+    print("------------------------------");
+
+    // 3. حفظ التوكن في قاعدة البيانات لكي نعرف من نراسل
+    if (token != null) {
+      String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
+      if (myUid.isNotEmpty) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(myUid)
+            .set({'fcmToken': token}, SetOptions(merge: true));
+        print("✅ تم حفظ التوكن في الفايربيس بنجاح");
+      }
+    }
   }
 
   Future<void> _loadUserData() async {

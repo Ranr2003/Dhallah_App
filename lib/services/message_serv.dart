@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/message_model.dart';
+import 'notification_serv.dart';
 
 class MessageService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -11,6 +12,10 @@ class MessageService {
     try {
       final String currentUserId = _auth.currentUser!.uid;
 
+      // 1. جلب اسم المرسل (أنتِ) من مجموعة users في الفايربيس
+      final senderDoc = await _firestore.collection('users').doc(currentUserId).get();
+      String senderName = senderDoc.data()?['name'] ?? "مستخدم";
+
       MessageModel newMessage = MessageModel(
         senderId: currentUserId,
         receiverId: receiverId,
@@ -19,17 +24,27 @@ class MessageService {
         isRead: false,
       );
 
-      // تخزين الرسالة في مجموعة "messages"
-      // ملاحظة: يفضل استخدام chatRoomId لترتيب الرسائل بين شخصين محددين
+      // 2. بناء معرف الغرفة الموحد
       List<String> ids = [currentUserId, receiverId];
-      ids.sort(); // ترتيب المعرفات لضمان وجود ID موحد لغرفة الدردشة
+      ids.sort();
       String chatRoomId = ids.join("_");
 
+      // 3. تخزين الرسالة في Firestore
       await _firestore
           .collection('chat_rooms')
           .doc(chatRoomId)
           .collection('messages')
           .add(newMessage.toMap());
+
+      // 4. إرسال الإشعار للمستلم مع اسم المرسل الحقيقي
+      await NotificationService().sendNotification(
+        receiverId: receiverId,
+        title: "رسالة من $senderName 💬",
+        body: messageText,
+        type: "chat",
+      );
+
+      print("تم إرسال الرسالة والإشعار بنجاح من $senderName");
 
     } catch (e) {
       print("Error sending message: $e");
@@ -46,7 +61,7 @@ class MessageService {
         .collection('chat_rooms')
         .doc(chatRoomId)
         .collection('messages')
-        .orderBy('timestamp', descending: false)
+        .orderBy('timestamp', descending: true)
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) {
@@ -56,7 +71,6 @@ class MessageService {
   }
 
   // 3. جلب قائمة المحادثات الأخيرة (لشاشة الرسائل الرئيسية)
-  // هذه الدالة ستحتاجها لعرض قائمة "سارة، فراس، خالد..."
   Stream<QuerySnapshot> getChatRooms() {
     return _firestore.collection('chat_rooms').snapshots();
   }

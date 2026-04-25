@@ -972,25 +972,32 @@ class ChatBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: isSender ? Alignment.centerLeft : Alignment.centerRight,
+      // التعديل: المرسل (أنا) يمين، والمستقبل (هو) يسار
+      alignment: isSender ? Alignment.centerRight : Alignment.centerLeft,
       child: Column(
-        crossAxisAlignment: isSender ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+        // محاذاة الوقت أسفل الفقاعة بناءً على الطرف
+        crossAxisAlignment: isSender ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
           Container(
             margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            constraints: BoxConstraints(
+              // تحديد أقصى عرض للفقاعة لكي لا تأخذ الشاشة كاملة في الرسائل القصيرة
+              maxWidth: MediaQuery.of(context).size.width * 0.75,
+            ),
             decoration: BoxDecoration(
-              // لون الفقاعة: أزرق فاتح للمرسل، أبيض للمستقبل حسب التصميم
-              color: isSender ? const Color(0xFFCDE2FD) : AppColors.white,
+              // الألوان: بنفسجي للمرسل (أنا)، وأبيض/رمادي فاتح للمستقبل
+              color: isSender ? const Color(0xFFB293CD) : Colors.white,
               borderRadius: BorderRadius.only(
                 topLeft: const Radius.circular(20),
                 topRight: const Radius.circular(20),
-                bottomLeft: Radius.circular(isSender ? 0 : 20),
-                bottomRight: Radius.circular(isSender ? 20 : 0),
+                // الزاوية الحادة تكون جهة الطرف المرسل
+                bottomLeft: Radius.circular(isSender ? 20 : 0),
+                bottomRight: Radius.circular(isSender ? 0 : 20),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.03),
+                  color: Colors.black.withOpacity(0.05),
                   blurRadius: 5,
                   offset: const Offset(0, 2),
                 ),
@@ -998,10 +1005,11 @@ class ChatBubble extends StatelessWidget {
             ),
             child: Text(
               message,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
+              style: TextStyle(
+                // لون النص أبيض إذا كانت الخلفية بنفسجية (أنا)، وأسود للمستقبل
+                color: isSender ? Colors.white : const Color(0xFF5A4A75),
                 fontSize: 15,
-                fontFamily: 'Tajawal',
+                fontFamily: 'Cairo', // استخدمت Cairo ليتناسب مع باقي تطبيقك
               ),
             ),
           ),
@@ -1009,7 +1017,11 @@ class ChatBubble extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 15),
             child: Text(
               time,
-              style: const TextStyle(fontSize: 10, color: AppColors.textHint, fontFamily: 'Tajawal'),
+              style: const TextStyle(
+                  fontSize: 10,
+                  color: Color(0xFFB293CD),
+                  fontFamily: 'Cairo'
+              ),
             ),
           ),
         ],

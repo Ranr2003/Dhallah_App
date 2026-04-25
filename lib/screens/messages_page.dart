@@ -1,16 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import '../models/message_model.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_widgets.dart';
-import '../services/message_serv.dart';
 import 'package:dhallah_app/services/chat_service.dart';
+import 'package:http/http.dart' as http; // لا تنسي هذا الاستيراد في الأعلى
+import 'dart:convert';
 
 class MessagesPage extends StatefulWidget {
   final String userName;
   final String receiverId;
-  final String chatRoomId;
+  final String chatRoomId; // سنعتمد هذا الـ ID بشكل أساسي
 
   const MessagesPage({
     super.key,
@@ -22,81 +22,107 @@ class MessagesPage extends StatefulWidget {
   @override
   State<MessagesPage> createState() => _MessagesPageState();
 }
+
 class _MessagesPageState extends State<MessagesPage> {
   final ChatService _chatService = ChatService();
   final TextEditingController messageController = TextEditingController();
-
-  late String currentUserId;
+  final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
 
   @override
   void initState() {
     super.initState();
-    print("Current User UID: ${_chatService.currentUserId}");
-    currentUserId = _chatService.currentUserId ?? "unknown";
+    _markAsRead(); // تصفير عند الدخول لأول مرة
+  }
+
+  void _markAsRead() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(widget.chatRoomId)
+          .update({'unreadCount': 0});
+      print("✅ تم تصفير العداد بنجاح");
+    } catch (e) {
+      print("⚠️ تنبيه تصفير العداد: $e");
+    }
   }
 
   void sendMessage() async {
     if (messageController.text.trim().isEmpty) return;
+
+    String messageText = messageController.text.trim();
     final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
-    List<String> ids = [myUid, widget.receiverId];
-    ids.sort();
-    String chatRoomId = ids.join("_");
 
+    try {
+      // 1. إرسال الرسالة وتحديث العداد (كودك الحالي)
+      await FirebaseFirestore.instance.collection('chat_rooms').doc(widget.chatRoomId).update({
+        'lastMessage': messageText,
+        'lastSenderId': myUid,
+        'timestamp': FieldValue.serverTimestamp(),
+        'unreadCount': FieldValue.increment(1),
+      });
 
-    await FirebaseFirestore.instance.collection('chat_rooms').doc(chatRoomId).set({
-      'participants': FieldValue.arrayUnion([myUid, widget.receiverId]),
-      'lastMessage': messageController.text,
-      'lastSenderId': myUid,
-      'timestamp': FieldValue.serverTimestamp(),
-      // أزيلي أسطر receiverName و senderName من هنا
-    }, SetOptions(merge: true));
+      await FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(widget.chatRoomId)
+          .collection('messages')
+          .add({
+        'senderId': myUid,
+        'receiverId': widget.receiverId,
+        'message': messageText,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
 
-    await FirebaseFirestore.instance
-        .collection('chat_rooms')
-        .doc(chatRoomId)
-        .collection('messages')
-        .add({
-      'senderId': myUid,
-      'message': messageController.text,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
+      // 2. إرسال الإشعار للطرف الآخر
+      _sendPushNotification(widget.receiverId, messageText);
 
-    messageController.clear();
+      messageController.clear();
+    } catch (e) {
+      print("خطأ في الإرسال: $e");
+      // ... كود الـ set في حال فشل الـ update
+    }
+  }
+
+// دالة إرسال الإشعار للطرف الآخر
+  Future<void> _sendPushNotification(String receiverId, String msg) async {
+    try {
+      // جلب توكن الشخص "المستقبل"
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(receiverId)
+          .get();
+
+      if (userDoc.exists) {
+        String? receiverToken = userDoc.get('fcmToken');
+
+        if (receiverToken != null) {
+          // إرسال الإشعار عبر API الفايربيس
+          // ملاحظة: ستحتاجين لـ Server Key من إعدادات الفايربيس (Cloud Messaging)
+          final response = await http.post(
+            Uri.parse('https://fcm.googleapis.com/fcm/send'),
+            headers: <String, String>{
+              'Content-Type': 'application/json',
+              'Authorization': 'key=YOUR_SERVER_KEY_HERE', // استبدليه بمفتاحك
+            },
+            body: jsonEncode(<String, dynamic>{
+              'notification': <String, dynamic>{
+                'title': 'رسالة جديدة من ${widget.userName}',
+                'body': msg,
+                'sound': 'default',
+              },
+              'priority': 'high',
+              'to': receiverToken,
+            }),
+          );
+          print('Notification Response: ${response.statusCode}');
+        }
+      }
+    } catch (e) {
+      print("خطأ في إرسال الإشعار الفعلي: $e");
+    }
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
-    // 1. الحصول على الـ IDs للطرفين
-    final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
-    final String otherUserId = widget.receiverId;
-
-    // 2. تكوين الـ ID الموحد (نفس الطريقة المستخدمة في sendMessage)
-    // هذا يضمن أن ريم ورسيل يفتحون نفس الغرفة دائماً
-    List<String> ids = [myUid, otherUserId];
-    ids.sort();
-    String unifiedChatRoomId = ids.join("_");
-
-    Widget _buildAppBarTitle() {
-      return StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('users') // نفترض أن معلومات المستخدمين هنا
-            .doc(widget.receiverId)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data!.exists) {
-            var userData = snapshot.data!.data() as Map<String, dynamic>;
-            return Text(
-              userData['name'] ?? "مستخدم",
-              style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-            );
-          }
-          // اسم احتياطي من الويجت أثناء التحميل
-          return Text(widget.userName, style: const TextStyle(color: AppColors.textPrimary));
-        },
-      );
-    }
-
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -108,78 +134,77 @@ class _MessagesPageState extends State<MessagesPage> {
       child: Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary),
             onPressed: () => Navigator.pop(context),
           ),
-          title: _buildAppBarTitle(),
+          title: StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance.collection('chat_rooms').doc(widget.chatRoomId).snapshots(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data!.exists) {
+                var roomData = snapshot.data!.data() as Map<String, dynamic>;
+                int unreadCount = (roomData['unreadCount'] as num? ?? 0).toInt();
+                String lastSenderId = roomData['lastSenderId'] ?? "";
+
+                // التصفير الذكي: فقط إذا جاءت رسالة جديدة من الطرف الآخر وأنتِ تشاهدينها
+                if (unreadCount > 0 && lastSenderId != myUid) {
+                  _markAsRead();
+                }
+              }
+              return Text(
+                widget.userName,
+                style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontFamily: 'Cairo'),
+              );
+            },
+          ),
           centerTitle: true,
-          elevation: 0,
-          backgroundColor: Colors.white,
         ),
         body: Column(
           children: [
             const SizedBox(height: 10),
-            // --- تعديل الصورة والاسم تحتها أيضاً ---
-            StreamBuilder<DocumentSnapshot>(
-              stream: FirebaseFirestore.instance.collection('chat_rooms').doc(unifiedChatRoomId).snapshots(),
-              builder: (context, roomSnapshot) {
-                String name = widget.userName;
-                if (roomSnapshot.hasData && roomSnapshot.data!.exists) {
-                  var roomData = roomSnapshot.data!.data() as Map<String, dynamic>;
-                  name = (myUid == roomData['receiverId'])
-                      ? (roomData['senderName'] ?? "مستخدم")
-                      : (roomData['receiverName'] ?? "مستخدم");
-                }
-                return Column(
-                  children: [
-                    Center(child: ChatAvatar(imageUrl: 'https://via.placeholder.com/150')),
-                    const SizedBox(height: 10),
-                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  ],
-                );
-              },
+            // الجزء العلوي (الصورة والاسم)
+            Column(
+              children: [
+                const Center(child: ChatAvatar(imageUrl: 'https://via.placeholder.com/150')),
+                const SizedBox(height: 10),
+                Text(widget.userName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, fontFamily: 'Cairo')),
+              ],
             ),
             const SizedBox(height: 20),
 
+            // قائمة الرسائل
             Expanded(
               child: StreamBuilder<QuerySnapshot>(
-                // نستخدم unifiedChatRoomId لضمان قراءة الرسائل من الغرفة الصحيحة
                 stream: FirebaseFirestore.instance
                     .collection('chat_rooms')
-                    .doc(unifiedChatRoomId)
+                    .doc(widget.chatRoomId)
                     .collection('messages')
-                    .orderBy('timestamp', descending: false)
+                    .orderBy('timestamp', descending: true)
                     .snapshots(),
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator(color: Color(0xFFB293CD)));
                   }
                   if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                    return const Center(child: Text("لا توجد رسائل بعد.. ابدأ الدردشة!"));
+                    return const Center(child: Text("ابدأ الدردشة الآن..", style: TextStyle(fontFamily: 'Cairo')));
                   }
 
                   final messages = snapshot.data!.docs;
 
                   return ListView.builder(
+                    reverse: true, // لتبدأ القائمة من الأسفل
                     padding: const EdgeInsets.symmetric(horizontal: 15),
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       var data = messages[index].data() as Map<String, dynamic>;
-
-                      // مقارنة الـ senderId بـ UID المستخدم الحالي
                       bool isMe = data['senderId'] == myUid;
 
-                      // استخراج الوقت بشكل صحيح
                       DateTime? date = (data['timestamp'] as Timestamp?)?.toDate();
-                      String timeString = "";
-                      if (date != null) {
-                        // تنسيق الوقت (ساعة:دقيقة)
-                        timeString = "${date.hour}:${date.minute.toString().padLeft(2, '0')}";
-                      }
+                      String timeString = date != null ? "${date.hour}:${date.minute.toString().padLeft(2, '0')}" : "";
 
                       return ChatBubble(
-                        // تأكدي أن الحقل في الفايربيس اسمه 'message' كما في دالة الإرسال
                         message: data['message'] ?? "",
                         isSender: isMe,
                         time: timeString,
@@ -190,8 +215,8 @@ class _MessagesPageState extends State<MessagesPage> {
               ),
             ),
 
+            // حقل الإدخال
             ChatInputField(
-              // تأكدي أن اسم الكنترولر هنا يطابق المعرف فوق (_messageController)
               controller: messageController,
               onSend: sendMessage,
             ),
@@ -201,5 +226,4 @@ class _MessagesPageState extends State<MessagesPage> {
       ),
     );
   }
-
 }
