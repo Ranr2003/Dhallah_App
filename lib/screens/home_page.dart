@@ -525,7 +525,13 @@ class _HomePageState extends State<HomePage> {
     if (report.ai_status == 'completed') {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => MatchesPage(matches: report.matches, currentUid: currentUid)),
+        MaterialPageRoute(
+          builder: (context) => MatchesPage(
+            matches: report.matches,     // قائمة المطابقات من المودل
+            currentUid: currentUid,      // معرف المستخدم الحالي (ريم)
+            reportId: report.reportId ?? "", // معرف البلاغ الحالي لربطه بالمحادثة
+          ),
+        ),
       );
     } else {
       String message = report.ai_status == 'error' ? 'حدث خطأ في المعالجة' : '... جاري تحليل الصور والنصوص للمطابقة ';

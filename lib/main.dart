@@ -70,7 +70,7 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => const SignUpPage(),
         '/home': (context) => const HomePage(),
         '/chatList': (context) => const ChatListPage(),
-        '/messages': (context) => const MessagesPage(receiverId: '', userName: '', chatRoomId: '',),
+        //'/messages': (context) => const MessagesPage(receiverId: '', userName: '', chatRoomId: '',),
       },
     );
   }

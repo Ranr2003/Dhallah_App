@@ -116,6 +116,9 @@ class ChatListPage extends StatelessWidget {
                                       userName: displayUsername,
                                       receiverId: otherUserId,
                                       chatRoomId: chatRoomId,
+                                      senderId: myUid,
+                                      reportId: (myUid == room['senderId'] ? room['senderreportId'] : room['receiverreportId']) ?? "",
+                                      receiverReportId: (myUid == room['senderId'] ? room['receiverreportId'] : room['senderreportId']) ?? "",
                                     ),
                                   ),
                                 );
