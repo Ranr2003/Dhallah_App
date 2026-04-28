@@ -30,7 +30,7 @@ class _MatchesPageState extends State<MatchesPage> {
 
   Future<Report?> _getReport(String id) async {
     if (!_reportCache.containsKey(id)) {
-      _reportCache[id] = await _service.getReportById(id);
+      _reportCache[id] = await _service.fetchReportById(id);
     }
     return _reportCache[id];
   }
@@ -69,7 +69,7 @@ class _MatchesPageState extends State<MatchesPage> {
         alignment: Alignment.center,
         children: [
           Text(
-            "نتائج التطابق الذكي",
+            "نتائج التطابق",
             style: TextStyle(
               fontFamily: 'Tajawal',
               fontSize: AppDimens.fontAppBar,
@@ -80,7 +80,7 @@ class _MatchesPageState extends State<MatchesPage> {
           Align(
             alignment: Alignment.centerRight,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, size: 30, color: AppColors.primaryDark),
+              icon: const Icon(Icons.arrow_back_ios, size: 20, color: AppColors.primaryDark),
               onPressed: () => Navigator.pop(context),
             ),
           ),

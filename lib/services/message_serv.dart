@@ -5,11 +5,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../services/database_serv.dart';
-
+import '../services/Notification_serv.dart';
 class MessageService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
-
+  final NotificationService _notificationService = NotificationService();
   // ✅ تهيئة غرفة المحادثة
   Future<void> initializeChatRoom({
     required String chatRoomId,
@@ -74,7 +74,7 @@ class MessageService {
       'timestamp': FieldValue.serverTimestamp(),
     });
 
-    await sendPushNotification(
+    await _notificationService.sendPushNotification(
       receiverId: receiverId,
       msg: messageText,
       senderName: senderName,
@@ -82,39 +82,7 @@ class MessageService {
   }
 
   // ✅ إرسال إشعار Push
-  Future<void> sendPushNotification({
-    required String receiverId,
-    required String msg,
-    required String senderName,
-  }) async {
-    try {
-      DocumentSnapshot userDoc =
-      await _db.collection('users').doc(receiverId).get();
-      if (!userDoc.exists) return;
 
-      String? receiverToken = userDoc.get('fcmToken');
-      if (receiverToken == null) return;
-
-      await http.post(
-        Uri.parse('https://fcm.googleapis.com/fcm/send'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'key=YOUR_SERVER_KEY_HERE',
-        },
-        body: jsonEncode({
-          'notification': {
-            'title': 'رسالة جديدة من $senderName',
-            'body': msg,
-            'sound': 'default',
-          },
-          'priority': 'high',
-          'to': receiverToken,
-        }),
-      );
-    } catch (e) {
-      debugPrint("❌ خطأ في إرسال الإشعارات: $e");
-    }
-  }
 
   // ✅ و إنهاء المحادثة وحذف الرسائل
   Future<void> terminateConversation({

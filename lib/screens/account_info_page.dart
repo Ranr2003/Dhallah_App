@@ -1,4 +1,4 @@
-// account_info_page.dart
+// account_info_page.dart  // اضفته من برانش ليلى
 // Updated by Gemini for Rand - Dhallah Project
 
 import 'package:flutter/material.dart';
@@ -130,6 +130,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   Future<void> _onSavePressed() async {
+    final String currentUid = _authService.currentUserId;
+
+    if (currentUid == 'unknown' || currentUid.isEmpty) {
+      _showGuestWarning(context); // إظهار الرسالة الجميلة
+      return; // التوقف هنا وعدم إكمال عملية الحفظ
+    }
     final String enteredEmail = _emailController.text.trim();
     final String enteredName = _nameController.text.trim();
 
@@ -410,6 +416,47 @@ class _ProfilePageState extends State<ProfilePage> {
         const SizedBox(width: 8),
         Text("طريقة الدخول: $providerName", style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
       ],
+    );
+  }
+  void _showGuestWarning(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        content: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primary, // اللون البنفسجي الأساسي
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              )
+            ],
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lock_person_outlined, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  "عذراً، يجب تسجيل الدخول أولاً لتتمكن من حفظ بياناتك الشخصية",
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 }

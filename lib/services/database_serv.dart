@@ -1,10 +1,11 @@
-//database_serv.dart
+//database_serv.dart // اضفته من برانش ليلى
 //Rand
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import '../models/user_model.dart';
+
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -19,6 +20,15 @@ class DatabaseService {
         // إذا المستخدم موجود، نحدث البيانات مع الحفاظ على الاسم القديم إذا كان موجوداً
         Map<String, dynamic> existingData = docSnap.data() as Map<String, dynamic>;
         Map<String, dynamic> newData = user.toMap();
+
+        if (existingData['userType'] == 'admin') {
+          newData['userType'] = 'admin';
+        }
+
+        // 2. حماية حالة الحظر (المحظور يبقى محظوراً ولا يتم تصفير حالته عند الدخول)
+        if (existingData['isBanned'] == true) {
+          newData['isBanned'] = true;
+        }
 
         if (existingData['name'] != null && existingData['name'].toString().isNotEmpty) {
           newData.remove('name'); // نحذف الاسم من البيانات الجديدة لكي لا يمسح القديم في الـ merge
@@ -98,17 +108,27 @@ class DatabaseService {
     // نرجع true فقط إذا وجدنا شخصاً آخر (UID مختلف) يستخدم نفس القيمة
     return query.docs.any((doc) => doc.id != currentUid);
   }
-  // دالة لجلب بيانات المستخدم كـ Object (للاستخدام في الهوم بيج وغيرها)
-  Future<RegularUser?> getUserById(String uid) async {
+  /// الدالة المحدثة: تجلب المستخدم وتحدد نوعه تلقائياً
+  Future<dynamic> getUserById(String uid) async {
     try {
       DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
       if (doc.exists && doc.data() != null) {
-        // تحويل البيانات من Firestore إلى موديل RegularUser
-        return RegularUser.fromMap(doc.data() as Map<String, dynamic>);
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+
+        // التحقق من نوع المستخدم بناءً على الحقل في Firestore
+        if (data['userType'] == 'admin') {
+          return Admin.fromMap(data);
+        } else {
+          return RegularUser.fromMap(data);
+        }
       }
     } catch (e) {
       debugPrint("خطأ في جلب كائن المستخدم: $e");
     }
     return null;
+  }
+// دالة تعيد Stream لمراقبة بيانات المستخدم لحظياً
+  Stream<dynamic> getUserStream(String uid) {
+    return _db.collection('users').doc(uid).snapshots();
   }
 }

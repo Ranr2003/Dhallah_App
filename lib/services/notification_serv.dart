@@ -1,26 +1,31 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // أضفنا هذا
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import '../models/notification_model.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class NotificationService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  final FirebaseMessaging _fcm = FirebaseMessaging.instance; // أضفنا هذا
+  final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
-  // --- وظائف جديدة للـ Push Notifications ---
-
-  // 1. الحصول على الـ Token الخاص بالجهاز وتخزينه
+  // 1. حفظ توكن الجهاز
   Future<void> saveDeviceToken(String userId) async {
-    String? token = await _fcm.getToken();
-    if (token != null) {
-      await _db.collection('users').doc(userId).set({
-        'fcmToken': token,
-      }, SetOptions(merge: true));
-      print("Token Saved: $token");
+    try {
+      String? token = await _fcm.getToken();
+      if (token != null) {
+        await _db.collection('users').doc(userId).set({
+          'fcmToken': token,
+        }, SetOptions(merge: true));
+      }
+    } catch (e) {
+      print("Error saving token: $e");
     }
   }
 
-  // --- وظائفك القديمة مع تعديل بسيط ---
-
+  // 2. جلب الإشعارات (مع معالجة خطأ الترتيب المحتمل)
   Stream<List<NotificationModel>> getNotifications(String userId) {
     return _db
         .collection('notifications')
@@ -32,41 +37,110 @@ class NotificationService {
         .toList());
   }
 
-  // تعديل دالة إرسال الإشعار لتشمل الـ Push Notification مستقبلاً
+  // 3. دالة جديدة: جلب عدد الإشعارات غير المقروءة (للنقطة الحمراء)
+  Stream<int> getUnreadCount(String userId) {
+    return _db
+        .collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .where('isRead', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.docs.length);
+  }
+
+  // 4. إرسال الإشعار مع منع التكرار (تعديلك الذكي)
   Future<void> sendNotification({
     required String receiverId,
     required String title,
     required String body,
     required String type,
+    String? reportId,
   }) async {
-    // 1. حفظ في قاعدة البيانات (كما هو)
-    await _db.collection('notifications').add({
-      'receiverId': receiverId,
-      'title': title,
-      'body': body,
-      'type': type,
-      'createdAt': FieldValue.serverTimestamp(),
-      'isRead': false,
-    });
+    try {
+      // التحقق من التكرار في حال كان تطابق
+      if (type == 'match' && reportId != null) {
+        var existing = await _db
+            .collection('notifications')
+            .where('receiverId', isEqualTo: receiverId)
+            .where('reportId', isEqualTo: reportId)
+            .where('type', isEqualTo: 'match')
+            .limit(1)
+            .get();
 
-    // 2. هنا مستقبلاً سنستدعي Cloud Functions لإرسال التنبيه الفعلي للجوال
-    // لأن إرسال Push Notification مباشرة من التطبيق لم يعد آمناً (Legacy API)
+        if (existing.docs.isNotEmpty) {
+          return;
+        }
+      }
+
+      // إضافة الإشعار
+      await _db.collection('notifications').add({
+        'receiverId': receiverId,
+        'reportId': reportId,
+        'title': title,
+        'body': body,
+        'type': type,
+        'createdAt': FieldValue.serverTimestamp(), // الوقت من السيرفر
+        'isRead': false,
+      });
+    } catch (e) {
+      print("Error sending notification: $e");
+    }
   }
 
-  // ... باقي دوالك (markAsRead, markAllAsRead, notifyOnNewMatch) كما هي بدون تغيير
-
+  // 5. تحديث الحالة كمقروء
   Future<void> markAsRead(String notificationId) async {
     await _db.collection('notifications').doc(notificationId).update({'isRead': true});
   }
 
+  // 6. تحديث الكل كمقروء (باستخدام Batch لأداء أسرع)
   Future<void> markAllAsRead(String userId) async {
-    var batch = _db.batch();
-    var snapshots = await _db.collection('notifications')
+    var snapshots = await _db
+        .collection('notifications')
         .where('receiverId', isEqualTo: userId)
-        .where('isRead', isEqualTo: false).get();
+        .where('isRead', isEqualTo: false)
+        .get();
+
+    if (snapshots.docs.isEmpty) return;
+
+    var batch = _db.batch();
     for (var doc in snapshots.docs) {
       batch.update(doc.reference, {'isRead': true});
     }
     await batch.commit();
   }
+  Future<void> sendPushNotification({
+    required String receiverId,
+    required String msg,
+    required String senderName,
+  }) async {
+    try {
+      DocumentSnapshot userDoc =
+      await _db.collection('users').doc(receiverId).get();
+      if (!userDoc.exists) return;
+
+      String? receiverToken = userDoc.get('fcmToken');
+      if (receiverToken == null) return;
+
+      await http.post(
+        Uri.parse('https://fcm.googleapis.com/fcm/send'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'key=YOUR_SERVER_KEY_HERE',
+        },
+        body: jsonEncode({
+          'notification': {
+            'title': 'رسالة جديدة من $senderName',
+            'body': msg,
+            'sound': 'default',
+          },
+          'priority': 'high',
+          'to': receiverToken,
+        }),
+      );
+    } catch (e) {
+      debugPrint("❌ خطأ في إرسال الإشعارات: $e");
+    }
+  }
+
+
+
 }
