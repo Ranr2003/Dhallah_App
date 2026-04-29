@@ -13,6 +13,7 @@ class MessagesPage extends StatefulWidget {
   final String senderId;
   final String reportId;
   final String receiverReportId;
+  final bool fromMatches; // 🛠️ إضافة المتغير
 
   const MessagesPage({
     super.key,
@@ -22,6 +23,7 @@ class MessagesPage extends StatefulWidget {
     required this.senderId,
     required this.reportId,
     required this.receiverReportId,
+    this.fromMatches = false, // 🛠️ افتراضياً false (للقادمين من قائمة الرسائل)
   });
 
   @override
@@ -50,7 +52,13 @@ class _MessagesPageState extends State<MessagesPage> {
       chatRoomId: widget.chatRoomId,
       onRoomDeleted: () {
         if (mounted) {
-          Navigator.of(context).pop();
+          // 🛠️ منطق العودة المخصص
+          if (widget.fromMatches) {
+            Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+          } else {
+            Navigator.of(context).pop();
+          }
+          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
                 content: Text("تم إنهاء هذه المحادثة")),

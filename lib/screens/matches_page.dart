@@ -278,7 +278,8 @@ class _MatchesPageState extends State<MatchesPage> {
                         chatRoomId: chatRoomId,
                         senderId: senderId,
                         reportId: widget.reportId,
-                        receiverReportId: report.reportId ?? "", // التأكد من عدم إرسال null
+                        receiverReportId: report.reportId ?? "",
+                        fromMatches: true, // 🛠️ تم التعديل هنا لتمرير القيمة true
                       ),
                     ),
                   );
