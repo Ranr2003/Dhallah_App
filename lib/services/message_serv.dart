@@ -1,16 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../services/database_serv.dart';
-import '../services/Notification_serv.dart';
+import '../services/notification_serv.dart';
+
 class MessageService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
-  final NotificationService _notificationService = NotificationService();
-  // ✅ تهيئة غرفة المحادثة
+
+  /// [initializeChatRoom]: تنشئ غرفة محادثة جديدة في Firestore وتخزن بيانات المشاركين والبلاغات المرتبطة.
   Future<void> initializeChatRoom({
     required String chatRoomId,
     required String senderId,
@@ -37,19 +36,19 @@ class MessageService {
     }, SetOptions(merge: true));
   }
 
-  // ✅ تصفير عداد الرسائل غير المقروءة
+  /// [markAsRead]: تصفّر عداد الرسائل غير المقروءة للمستخدم الحالي داخل غرفة محادثة محددة.
   Future<void> markAsRead(String chatRoomId) async {
     try {
       await _db
           .collection('chat_rooms')
           .doc(chatRoomId)
-          .update({'unreadCount': 0});
+          .update({'unreadCount_$myUid': 0});
     } catch (e) {
       debugPrint("⚠️ تنبيه تصفير العداد: $e");
     }
   }
 
-  // ✅ إرسال رسالة
+  /// [sendMessage]: ترسل رسالة جديدة، تحدث "آخر رسالة" في الغرفة، وتزيد عداد غير المقروء للمستلم.
   Future<void> sendMessage({
     required String chatRoomId,
     required String messageText,
@@ -60,7 +59,7 @@ class MessageService {
       'lastMessage': messageText,
       'lastSenderId': myUid,
       'timestamp': FieldValue.serverTimestamp(),
-      'unreadCount': FieldValue.increment(1),
+      'unreadCount_$receiverId': FieldValue.increment(1),
     });
 
     await _db
@@ -74,17 +73,45 @@ class MessageService {
       'timestamp': FieldValue.serverTimestamp(),
     });
 
-    await _notificationService.sendPushNotification(
+    await _saveMessageNotificationForReceiver(
       receiverId: receiverId,
-      msg: messageText,
+      chatRoomId: chatRoomId,
       senderName: senderName,
+      message: messageText,
     );
   }
 
-  // ✅ إرسال إشعار Push
+  /// [_saveMessageNotificationForReceiver]: تخزن مستند إشعار في Firestore للمستلم لضمان ظهور الرسالة في سجل تنبيهاته.
+  Future<void> _saveMessageNotificationForReceiver({
+    required String receiverId,
+    required String chatRoomId,
+    required String senderName,
+    required String message,
+  }) async {
+    // منع التكرار
+    var existing = await _db
+        .collection('notifications')
+        .where('receiverId', isEqualTo: receiverId)
+        .where('chatRoomId', isEqualTo: chatRoomId)
+        .where('type', isEqualTo: 'message')
+        .where('isRead', isEqualTo: false)
+        .limit(1)
+        .get();
 
+    if (existing.docs.isNotEmpty) return;
 
-  // ✅ و إنهاء المحادثة وحذف الرسائل
+    await _db.collection('notifications').add({
+      'receiverId': receiverId,
+      'title': "رسالة جديدة من $senderName",
+      'body': message,
+      'type': 'message',
+      'chatRoomId': chatRoomId,
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+  }
+
+  /// [terminateConversation]: تحذف غرفة المحادثة وجميع رسائلها نهائياً، ويمكنها إغلاق البلاغات المرتبطة بها أيضاً.
   Future<void> terminateConversation({
     required String chatRoomId,
     required bool shouldCloseStatus,
@@ -115,8 +142,8 @@ class MessageService {
     }
   }
 
-  // ✅ جلب نوع بلاغ المستخدم الحالي
-  Future<String?> getMyReportType({
+  /// [getMyReportType]: تحدد نوع بلاغ المستخدم الحالي (مفقود أم موجود) داخل المحادثة لعرض الواجهة المناسبة.
+   Future<String?> getMyReportType({
     required String senderId,
     required String reportId,
     required String receiverReportId,
@@ -131,7 +158,7 @@ class MessageService {
     }
   }
 
-  // ✅ مستمع غرفة المحادثة (للكشف عن حذفها)
+  /// [startRoomListener]: تراقب الغرفة باستمرار لإغلاق صفحة الدردشة فوراً إذا قام الطرف الآخر بحذف المحادثة.
   StreamSubscription<DocumentSnapshot> startRoomListener({
     required String chatRoomId,
     required VoidCallback onRoomDeleted,
@@ -147,7 +174,7 @@ class MessageService {
     });
   }
 
-  // ✅ Stream رسائل الغرفة
+  /// [getMessages]: تجلب تدفقاً حياً (Stream) لجميع الرسائل داخل الغرفة مرتبة زمنياً.
   Stream<QuerySnapshot> getMessages(String chatRoomId) {
     return _db
         .collection('chat_rooms')
@@ -157,7 +184,7 @@ class MessageService {
         .snapshots();
   }
 
-  // ✅ Stream بيانات الغرفة
+  /// [getChatRoomStream]: تجلب تدفقاً حياً لبيانات غرفة المحادثة (مثل أسماء الأطراف وحالة العدادات) لتحديث الواجهة لحظياً.
   Stream<DocumentSnapshot> getChatRoomStream(String chatRoomId) {
     return _db.collection('chat_rooms').doc(chatRoomId).snapshots();
   }

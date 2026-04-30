@@ -1,9 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../services/item_serv.dart';
 import '../services/authentication_serv.dart';
 import '../services/database_serv.dart';
@@ -18,17 +15,8 @@ import 'lost_report_page.dart';
 import 'found_report_page.dart';
 import 'notifications_page.dart';
 import 'matches_page.dart';
+import 'dart:async';
 
-
-const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'high_importance_channel',
-  'إشعارات ضالة الهامة',
-  description: 'هذه القناة تستخدم لإشعارات الدردشة والمطابقة',
-  importance: Importance.max,
-);
-
-
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 
 class HomePage extends StatefulWidget {
@@ -49,52 +37,32 @@ class _HomePageState extends State<HomePage> {
   String currentUid = "";
 
 
-  @override
-  void initState() {
+  @override  void initState() {
     super.initState();
     _loadUserData();
-    _setupToken();
-    _setupForegroundNotifications();
   }
-
-
-  void _setupForegroundNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      RemoteNotification? notification = message.notification;
-      AndroidNotification? android = message.notification?.android;
-      if (notification != null && android != null) {
-        flutterLocalNotificationsPlugin.show(
-          notification.hashCode, notification.title, notification.body,
-          NotificationDetails(android: AndroidNotificationDetails(channel.id, channel.name, channelDescription: channel.description, importance: Importance.max, priority: Priority.high, icon: '@mipmap/ic_launcher')),
-        );
-      }
-    });
-  }
-
-
-  void _setupToken() async {
-    String? token = await FirebaseMessaging.instance.getToken();
-    if (token != null) {
-      String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
-      if (myUid.isNotEmpty) {
-        await FirebaseFirestore.instance.collection('users').doc(myUid).set({'fcmToken': token}, SetOptions(merge: true));
-      }
-    }
-  }
-
 
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
       if (mounted) setState(() => currentUid = user.uid);
+
+      // 1. تحديث التوكن لضمان المزامنة (شبكة أمان)
+      await _notificationService.saveDeviceToken();
+
+      // 2. تفعيل مستمعات الإشعارات الخاصة بهذا المستخدم
       _monitorReportsForMatches(user.uid);
+      _notificationService.setupChatNotifications(user.uid);
+
+      // 3. جلب بيانات الاسم
       RegularUser? userData = await _dbService.getUserById(user.uid);
-      if (userData != null && mounted) setState(() => userName = userData.name);
+      if (userData != null && mounted) {
+        setState(() => userName = userData.name);
+      }
     }
   }
+
+
 
   void _monitorReportsForMatches(String userId) {
     FirebaseFirestore.instance
@@ -102,27 +70,39 @@ class _HomePageState extends State<HomePage> {
         .where('userId', isEqualTo: userId)
         .where('ai_status', isEqualTo: 'completed')
         .snapshots()
-        .listen((snapshot) {
+        .listen((snapshot) async {
       for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added || change.type == DocumentChangeType.modified) {
+        if (change.type == DocumentChangeType.added ||
+            change.type == DocumentChangeType.modified) {
+
           var reportData = change.doc.data() as Map<String, dynamic>;
           List matches = reportData['matches'] ?? [];
           String reportId = change.doc.id;
           String category = reportData['item']['category'] ?? 'عنصر';
 
           if (matches.isNotEmpty) {
-            _notificationService.sendNotification(
-              receiverId: userId,
-              reportId: reportId,
-              title: "تم العثور على تطابق ✨",
-              body: " وجدنا عنصرًا يطابق بلاغك  ($category)، تحقّق منه الآن ",
-              type: "match",
-            );
+            List<String> matchIds = matches.map((m) {
+              if (m is Map) {
+                return (m['reportId'] ?? m['id'] ?? "").toString();
+              }
+              return m.toString();
+            }).where((id) => id.isNotEmpty && id != "null").toList();
+
+            if (matchIds.isNotEmpty) {
+              await _notificationService.sendMatchNotification(
+                userId: userId,
+                reportId: reportId,
+                category: category,
+                currentMatchIds: matchIds,
+              );
+            }
           }
         }
       }
     });
   }
+
+
 
 
   @override

@@ -23,6 +23,7 @@ import '../screens/account_info_page.dart';
 import '../screens/home_page.dart';
 import '../models/user_model.dart';
 import 'admin_dashboard.dart';
+import '../services/notification_serv.dart'; // تأكدي من المسار الصحيح للملف الذي أنشأتيه
 
 // ---------------------------------------------------------
 //  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
@@ -104,6 +105,10 @@ class _LoginPageState extends State<LoginPage> {
 // تعديل دالة توجيه المستخدم لتشمل فحص الأدمن
 // ---------------------------------------------------------
   void _redirectUser(fb.User user, String provider, String emailOrPhone) async {
+
+    // 🔥🔥🔥 السطر المضاف لحفظ التوكن عند نجاح أي طريقة دخول 🔥🔥🔥
+    await NotificationService().saveDeviceToken();
+
     // 1. جلب بيانات المستخدم كاملة من الداتابيز
     var userData = await _dbService.getUserById(user.uid);
 

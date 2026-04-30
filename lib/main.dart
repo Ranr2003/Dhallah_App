@@ -1,10 +1,9 @@
 import 'package:dhallah_app/screens/chat_list_page.dart';
-import 'package:dhallah_app/screens/messages_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart'; // 1. أضفنا هذا
 import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
+import '../services/notification_serv.dart';
 
 // استيراد الشاشات
 import 'screens/start_page.dart';
@@ -12,12 +11,6 @@ import 'screens/login_page.dart';
 import 'screens/signup_page.dart';
 import 'screens/home_page.dart';
 
-// 2. دالة التعامل مع الإشعارات في الخلفية (يجب أن تكون خارج أي كلاس)
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  print("إشعار في الخلفية: ${message.messageId}");
-
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,16 +21,17 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
 
-  // 3. إعداد معالج الخلفية
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // 1. إعداد خدمة الإشعارات
+  NotificationService notificationService = NotificationService();
 
-  // 4. طلب إذن الإشعارات للمستخدم
-  FirebaseMessaging messaging = FirebaseMessaging.instance;
-  await messaging.requestPermission(
-    alert: true,
-    badge: true,
-    sound: true,
-  );
+  // 2. طلب الإذن (مرة واحدة فقط)
+  await notificationService.requestPermissions();
+
+  // 3. إعداد القنوات للاستقبال والتطبيق مفتوح (Foreground)
+  notificationService.setupForegroundNotifications();
+
+  // 4. ✅ إضافة مراقب تحديث التوكن لضمان المزامنة دائماً مع السيرفر
+  notificationService.setupTokenListeners();
 
   runApp(const MyApp());
 }
@@ -47,14 +41,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 5. استماع للإشعارات والتطبيق مفتوح (Foreground)
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      if (message.notification != null) {
-        print('وصل إشعار والتطبيق مفتوح: ${message.notification!.title}');
-        // يمكنك هنا إظهار SnackBar بسيط إذا أردتِ
-      }
-    });
-
     return MaterialApp(
       title: 'Dhallah App',
       debugShowCheckedModeBanner: false,
@@ -70,7 +56,6 @@ class MyApp extends StatelessWidget {
         '/signup': (context) => const SignUpPage(),
         '/home': (context) => const HomePage(),
         '/chatList': (context) => const ChatListPage(),
-        //'/messages': (context) => const MessagesPage(receiverId: '', userName: '', chatRoomId: '',),
       },
     );
   }

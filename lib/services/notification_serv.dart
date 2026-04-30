@@ -1,31 +1,239 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/notification_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+
+const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  'high_importance_channel',
+  'إشعارات ضالة الهامة',
+  description: 'هذه القناة تستخدم لإشعارات الدردشة والمطابقة',
+  importance: Importance.max,
+);
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+FlutterLocalNotificationsPlugin();
+
 
 class NotificationService {
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
-  // 1. حفظ توكن الجهاز
-  Future<void> saveDeviceToken(String userId) async {
-    try {
-      String? token = await _fcm.getToken();
-      if (token != null) {
-        await _db.collection('users').doc(userId).set({
-          'fcmToken': token,
-        }, SetOptions(merge: true));
-      }
-    } catch (e) {
-      print("Error saving token: $e");
+  /// ... (إعدادات الـ Singleton)  /// [requestPermissions]: تطلب الإذن من المستخدم لإظهار الإشعارات (تنبيه، صوت، شارة).
+  Future<void> requestPermissions() async {
+    NotificationSettings settings = await _fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('✅ تم منح الإذن من قبل المستخدم');
+    } else if (settings.authorizationStatus == AuthorizationStatus.provisional) {
+      print('⚠️ تم منح إذن مؤقت');
+    } else {
+      print('❌ رفض المستخدم منح الإذن');
     }
   }
 
-  // 2. جلب الإشعارات (مع معالجة خطأ الترتيب المحتمل)
+  /// [saveDeviceToken]: تجلب رمز الجهاز (FCM Token) من جوجل وتحفظه في حساب المستخدم بـ Firestore لمراسلته لاحقاً.
+  Future<void> saveDeviceToken() async {
+    try {
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) return;
+
+      String? token = await _fcm.getToken();
+
+      if (token != null) {
+        await _db.collection('users').doc(uid).set({
+          'fcmToken': token,
+          'lastTokenUpdate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        print("✅ تم حفظ التوكن بنجاح: $token");
+      }
+    } catch (e) {
+      print("❌ خطأ في حفظ التوكن: $e");
+    }
+  }
+
+  /// [deleteDeviceToken]: تحذف رمز الجهاز من قاعدة البيانات وتُبطله من جهاز المستخدم عند تسجيل الخروج للأمان.
+  Future<void> deleteDeviceToken() async {
+    try {
+      String? uid = FirebaseAuth.instance.currentUser?.uid;
+      
+      // 1. حذف التوكن من Firestore أولاً لقطع الصلة في السيرفر
+      if (uid != null) {
+        await _db.collection('users').doc(uid).update({
+          'fcmToken': FieldValue.delete(),
+        });
+      }
+
+      // 2. إبطال التوكن من FCM على الجهاز
+      await _fcm.deleteToken();
+      print("✅ تم حذف وإبطال التوكن بنجاح");
+    } catch (e) {
+      print("❌ خطأ في حذف التوكن: $e");
+    }
+  }
+
+  /// [setupForegroundNotifications]: تهيئ إعدادات ظهور الإشعار كـ "تنبيه علوي" عندما يكون المستخدم فاتحاً للتطبيق.
+  void setupTokenListeners() {
+    _fcm.onTokenRefresh.listen((newToken) {
+      saveDeviceToken();
+    });
+  }
+
+  /// [setupForegroundNotifications]: تهيئ إعدادات ظهور الإشعار كـ "تنبيه علوي" عندما يكون المستخدم فاتحاً للتطبيق.
+  void setupForegroundNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+    AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const InitializationSettings initializationSettings =
+    InitializationSettings(android: initializationSettingsAndroid);
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (details) {
+        print("تم الضغط على الإشعار: ${details.payload}");
+      },
+    );
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      RemoteNotification? notification = message.notification;
+      AndroidNotification? android = message.notification?.android;
+      if (notification != null && android != null) {
+        flutterLocalNotificationsPlugin.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              channel.id, channel.name,
+              channelDescription: channel.description,
+              importance: Importance.max,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  /// [setupChatNotifications]: تراقب غرف الدردشة في Firestore؛ إذا وصلت رسالة جديدة ولم تُقرأ، تُظهر إشعاراً محلياً للمستخدم.
+  void setupChatNotifications(String userId) {
+    FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .where('participants', arrayContains: userId)
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.modified) {
+          var data = change.doc.data() as Map<String, dynamic>;
+          String lastSenderId = data['lastSenderId'] ?? '';
+          String lastMessage = data['lastMessage'] ?? '';
+          
+          // ✅ تم التعديل هنا ليتوافق مع حقل عداد الرسائل الخاص بكل مستخدم
+          int unreadCount = (data['unreadCount_$userId'] ?? 0).toInt();
+
+          if (lastSenderId != userId && unreadCount > 0 && lastMessage.isNotEmpty) {
+            String correctSenderName = (lastSenderId == data['senderId'])
+                ? (data['senderName'] ?? '')
+                : (data['receiverName'] ?? '');
+
+            flutterLocalNotificationsPlugin.show(
+              change.doc.id.hashCode,
+              "رسالة جديدة من $correctSenderName",
+              lastMessage,
+              NotificationDetails(
+                android: AndroidNotificationDetails(
+                  channel.id, channel.name,
+                  channelDescription: channel.description,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  icon: '@mipmap/ic_launcher',
+                ),
+              ),
+            );
+          }
+        }
+      }
+    });
+  }
+
+
+  /// [sendMatchNotification]: تمر على مصفوفة التطابقات وترسل إشعاراً منفصلاً لكل تقرير جديد لم يسبق التنبيه عنه.
+  /// [sendMatchNotification]: تُرسل تنبيهاً واحداً فقط عند اكتشاف عناصر جديدة في مصفوفة التطابقات.
+  Future<void> sendMatchNotification({
+    required String userId,
+    required String reportId,
+    required String category,
+    required List<String> currentMatchIds,
+  }) async {
+    // 1. جلب جميع الـ IDs التي تم التنبيه عنها مسبقاً لهذا البلاغ
+    var notifiedDocs = await _db.collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .where('reportId', isEqualTo: reportId)
+        .where('type', isEqualTo: 'match')
+        .get();
+
+    Set<String> alreadyNotifiedIds = {};
+    for (var doc in notifiedDocs.docs) {
+      var data = doc.data();
+      if (data['notifiedMatchIds'] != null) {
+        alreadyNotifiedIds.addAll(List<String>.from(data['notifiedMatchIds']));
+      }
+      if (data['matchedReportId'] != null) {
+        alreadyNotifiedIds.add(data['matchedReportId'] as String);
+      }
+    }
+
+    // 2. تصفية القائمة لمعرفة الـ IDs "الجديدة فقط" التي لم يسبق إرسال إشعار عنها
+    List<String> newMatchIds = currentMatchIds
+        .where((id) => id != "null" && id.isNotEmpty && !alreadyNotifiedIds.contains(id))
+        .toList();
+
+    // 3. إذا لم يوجد أي عنصر جديد، نتوقف (هذا يمنع الإشعارات الـ 3 المكررة)
+    if (newMatchIds.isEmpty) return;
+
+    // 4. إظهار إشعار "واحد" فقط للمجموعة الجديدة
+    flutterLocalNotificationsPlugin.show(
+      reportId.hashCode, // معرف ثابت للبلاغ يضمن تحديث الإشعار بدلاً من تكراره
+      "تم العثور على تطابق جديد ✨",
+      "وجدنا نتائج جديدة تطابق بلاغك ($category)، تحقّق منها الآن",
+      NotificationDetails(
+        android: AndroidNotificationDetails(
+          channel.id, channel.name,
+          importance: Importance.max,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          groupKey: 'com.dhallah.MATCHES_GROUP',
+        ),
+      ),
+    );
+
+    // 5. حفظ مستند واحد في الفايرستور يحتوي على الـ IDs الجديدة
+    await _db.collection('notifications').add({
+      'receiverId': userId,
+      'reportId': reportId,
+      'matchedReportId': newMatchIds.first,
+      'notifiedMatchIds': newMatchIds, // قائمة العناصر الجديدة
+      'title': "تم العثور على تطابق جديد ✨",
+      'body': "وجدنا نتائج جديدة تطابق بلاغك ($category)، تحقّق منها الآن",
+      'type': 'match',
+      'createdAt': FieldValue.serverTimestamp(),
+      'isRead': false,
+    });
+  }
+
+
+  /// [getNotifications]: تجلب قائمة بجميع إشعارات المستخدم (رسائل، تطابقات) مرتبة من الأحدث للأقدم.
   Stream<List<NotificationModel>> getNotifications(String userId) {
     return _db
         .collection('notifications')
@@ -37,7 +245,7 @@ class NotificationService {
         .toList());
   }
 
-  // 3. دالة جديدة: جلب عدد الإشعارات غير المقروءة (للنقطة الحمراء)
+  /// [getUnreadCount]: تحسب عدد الإشعارات غير المقروءة لعرضها كرقم (Badge) فوق أيقونة الجرس.
   Stream<int> getUnreadCount(String userId) {
     return _db
         .collection('notifications')
@@ -47,51 +255,15 @@ class NotificationService {
         .map((snapshot) => snapshot.docs.length);
   }
 
-  // 4. إرسال الإشعار مع منع التكرار (تعديلك الذكي)
-  Future<void> sendNotification({
-    required String receiverId,
-    required String title,
-    required String body,
-    required String type,
-    String? reportId,
-  }) async {
-    try {
-      // التحقق من التكرار في حال كان تطابق
-      if (type == 'match' && reportId != null) {
-        var existing = await _db
-            .collection('notifications')
-            .where('receiverId', isEqualTo: receiverId)
-            .where('reportId', isEqualTo: reportId)
-            .where('type', isEqualTo: 'match')
-            .limit(1)
-            .get();
-
-        if (existing.docs.isNotEmpty) {
-          return;
-        }
-      }
-
-      // إضافة الإشعار
-      await _db.collection('notifications').add({
-        'receiverId': receiverId,
-        'reportId': reportId,
-        'title': title,
-        'body': body,
-        'type': type,
-        'createdAt': FieldValue.serverTimestamp(), // الوقت من السيرفر
-        'isRead': false,
-      });
-    } catch (e) {
-      print("Error sending notification: $e");
-    }
-  }
-
-  // 5. تحديث الحالة كمقروء
+  /// [markAsRead]: تحول حالة إشعار معين إلى "مقروء" عند الضغط عليه.
   Future<void> markAsRead(String notificationId) async {
-    await _db.collection('notifications').doc(notificationId).update({'isRead': true});
+    await _db
+        .collection('notifications')
+        .doc(notificationId)
+        .update({'isRead': true});
   }
 
-  // 6. تحديث الكل كمقروء (باستخدام Batch لأداء أسرع)
+  /// [markAllAsRead]: تحول جميع إشعارات المستخدم إلى "مقروءة" دفعة واحدة (مثلاً عند فتح صفحة التنبيهات).
   Future<void> markAllAsRead(String userId) async {
     var snapshots = await _db
         .collection('notifications')
@@ -107,40 +279,5 @@ class NotificationService {
     }
     await batch.commit();
   }
-  Future<void> sendPushNotification({
-    required String receiverId,
-    required String msg,
-    required String senderName,
-  }) async {
-    try {
-      DocumentSnapshot userDoc =
-      await _db.collection('users').doc(receiverId).get();
-      if (!userDoc.exists) return;
-
-      String? receiverToken = userDoc.get('fcmToken');
-      if (receiverToken == null) return;
-
-      await http.post(
-        Uri.parse('https://fcm.googleapis.com/fcm/send'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'key=YOUR_SERVER_KEY_HERE',
-        },
-        body: jsonEncode({
-          'notification': {
-            'title': 'رسالة جديدة من $senderName',
-            'body': msg,
-            'sound': 'default',
-          },
-          'priority': 'high',
-          'to': receiverToken,
-        }),
-      );
-    } catch (e) {
-      debugPrint("❌ خطأ في إرسال الإشعارات: $e");
-    }
-  }
-
-
 
 }
