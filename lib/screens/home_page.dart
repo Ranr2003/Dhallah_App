@@ -83,7 +83,7 @@ class _HomePageState extends State<HomePage> {
           if (matches.isNotEmpty) {
             List<String> matchIds = matches.map((m) {
               if (m is Map) {
-                return (m['reportId'] ?? m['id'] ?? "").toString();
+                return (m['matched_report_id'] ?? m['reportId'] ?? m['id'] ?? "").toString();
               }
               return m.toString();
             }).where((id) => id.isNotEmpty && id != "null").toList();

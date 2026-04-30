@@ -84,10 +84,8 @@ class ChatListPage extends StatelessWidget {
                             }
 
                             // معالجة عداد الرسائل (التأكد من أنه رقم صحيح)
-                            int unreadCount = 0;
-                            if (room['unreadCount'] != null) {
-                              unreadCount = (room['unreadCount'] as num).toInt();
-                            }
+                            int unreadCount = (room['unreadCount_$myUid'] as num? ?? 0).toInt();
+
 
                             // منطق ظهور النقطة البنفسجية
                             // تظهر فقط إذا كان العداد > 0 وأنتِ لستِ من أرسل الرسالة الأخيرة
@@ -104,7 +102,7 @@ class ChatListPage extends StatelessWidget {
                                 await FirebaseFirestore.instance
                                     .collection('chat_rooms')
                                     .doc(chatRoomId)
-                                    .update({'unreadCount': 0});
+                                    .update({'unreadCount_$myUid': 0});
 
                                 if (!context.mounted) return;
 
