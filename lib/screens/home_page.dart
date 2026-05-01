@@ -1,3 +1,4 @@
+//last edit by rand
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -47,7 +48,7 @@ class _HomePageState extends State<HomePage> {
     if (user != null) {
       if (mounted) setState(() => currentUid = user.uid);
       await _notificationService.saveDeviceToken();
-       _monitorReportsForMatches(user.uid);
+       // _monitorReportsForMatches(user.uid);
       // ❌ احذفي هذا السطر لأنه لم يعد موجوداً في الخدمة:
       // _notificationService.setupChatNotifications(user.uid);
       RegularUser? userData = await _dbService.getUserById(user.uid);
@@ -57,56 +58,7 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-
-  void _monitorReportsForMatches(String userId) {
-    FirebaseFirestore.instance
-        .collection('reports')
-        .where('userId', isEqualTo: userId)
-        .where('ai_status', isEqualTo: 'completed')
-        .where('status', isEqualTo: 'open') // ✅ أضيفي هذا السطر هنا
-        .snapshots()
-        .listen((snapshot) async {
-      for (var change in snapshot.docChanges) {
-
-        var reportData = change.doc.data() as Map<String, dynamic>;
-
-        String status = reportData['status'] ?? '';
-        String aiStatus = reportData['ai_status'] ?? '';
-
-        // 🚨 أهم شرط يمنع الإشعارات عند الإغلاق
-        if (status != 'open') {
-          print("🚫 البلاغ مغلق - تم تجاهله: ${change.doc.id}");
-          continue;
-        }
-
-        if (aiStatus != 'completed') {
-          continue;
-        }
-
-        List matches = reportData['matches'] ?? [];
-        String reportId = change.doc.id;
-        String category = reportData['item']['category'] ?? 'عنصر';
-
-        if (matches.isNotEmpty) {
-          List<String> matchIds = matches.map((m) {
-            if (m is Map) {
-              return (m['matched_report_id'] ?? m['reportId'] ?? m['id'] ?? "").toString();
-            }
-            return m.toString();
-          }).where((id) => id.isNotEmpty && id != "null").toList();
-
-          if (matchIds.isNotEmpty) {
-            await _notificationService.sendMatchNotification(
-              userId: userId,
-              reportId: reportId,
-              category: category,
-              currentMatchIds: matchIds,
-            );
-          }
-        }
-      }
-    });
-  }
+/// حذف الداله _monitorReportsForMatches///
 
 
   @override

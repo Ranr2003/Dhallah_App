@@ -1,3 +1,4 @@
+//last edit by rand
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -5,11 +6,17 @@ import '../models/notification_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 
-
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'high_importance_channel',
   'إشعارات ضالة الهامة',
   description: 'هذه القناة تستخدم لإشعارات الدردشة والمطابقة',
+  importance: Importance.max,
+);
+/// قناه لإشعارات المطابقة وكذلك التهنئه بإغلاق البلاغ ///
+const AndroidNotificationChannel matchesChannel = AndroidNotificationChannel(
+  'matches_channel_id',
+  'تطابقات مفقودات ضالة',
+  description: 'إشعارات عند العثور على أشياء تطابق بلاغك',
   importance: Importance.max,
 );
 
@@ -21,10 +28,11 @@ class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
-  /// ...  تطلب الإذن من المستخدم لإظهار الإشعارات (تنبيه، صوت، شارة).
+  /// ... (إعدادات الـ Singleton)  /// [requestPermissions]: تطلب الإذن من المستخدم لإظهار الإشعارات (تنبيه، صوت، شارة).
   Future<void> requestPermissions() async {
     NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
@@ -42,36 +50,23 @@ class NotificationService {
     }
   }
 
-  /// [saveDeviceToken]: تحفظ التوكن لأول مرة فقط؛ إذا وجد توكن مخزن مسبقاً لا تقم بتحديثه نهائياً.
+  /// [saveDeviceToken]: تجلب رمز الجهاز (FCM Token) من جوجل وتحفظه في حساب المستخدم بـ Firestore لمراسلته لاحقاً.
   Future<void> saveDeviceToken() async {
     try {
       String? uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
 
-      // 1. التحقق أولاً من وجود مستند للمستخدم وتوفر توكن فيه
-      DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
+      String? token = await _fcm.getToken();
 
-      if (userDoc.exists && userDoc.data() != null) {
-        var data = userDoc.data() as Map<String, dynamic>;
-        // إذا كان حقل fcmToken موجوداً (مهما كانت قيمته)، نتوقف فوراً ولا نحدثه
-        if (data.containsKey('fcmToken') && data['fcmToken'] != null) {
-          print("ℹ️ تم العثور على توكن سابق، لن يتم التحديث بناءً على تفضيلاتك.");
-          return;
-        }
-      }
-
-      // 2. إذا لم يوجد توكن نهائياً، نقوم بجلبه وحفظه لأول مرة
-      String? newToken = await _fcm.getToken();
-      if (newToken != null) {
+      if (token != null) {
         await _db.collection('users').doc(uid).set({
-          'fcmToken': newToken,
+          'fcmToken': token,
           'lastTokenUpdate': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        print("✅ تم حفظ التوكن لأول مرة بنجاح.");
+        print("✅ تم حفظ التوكن بنجاح: $token");
       }
-
     } catch (e) {
-      print("❌ خطأ في عملية حفظ التوكن: $e");
+      print("❌ خطأ في حفظ التوكن: $e");
     }
   }
 
@@ -121,14 +116,17 @@ class NotificationService {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
       if (notification != null && android != null) {
+        String type = message.data['type'] ?? 'chat'; //  فحص نوع الإشعار القادم من السحاب
         flutterLocalNotificationsPlugin.show(
           notification.hashCode,
           notification.title,
           notification.body,
           NotificationDetails(
             android: AndroidNotificationDetails(
-              channel.id, channel.name,
-              channelDescription: channel.description,
+              //  إذا كان النوع match استخدم قناة المطابقة، وإلا استخدم القناة الافتراضية
+              type == 'match' ? matchesChannel.id : channel.id,
+              type == 'match' ? matchesChannel.name : channel.name,
+              channelDescription: type == 'match' ? matchesChannel.description : channel.description,
               importance: Importance.max,
               priority: Priority.high,
               icon: '@mipmap/ic_launcher',
@@ -139,72 +137,49 @@ class NotificationService {
     });
   }
 
+  /// [setupChatNotifications]: تراقب غرف الدردشة في Firestore؛ إذا وصلت رسالة جديدة ولم تُقرأ، تُظهر إشعاراً محلياً للمستخدم.
+  void setupChatNotifications(String userId) {
+    FirebaseFirestore.instance
+        .collection('chat_rooms')
+        .where('participants', arrayContains: userId)
+        .snapshots()
+        .listen((snapshot) {
+      for (var change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.modified) {
+          var data = change.doc.data() as Map<String, dynamic>;
+          String lastSenderId = data['lastSenderId'] ?? '';
+          String lastMessage = data['lastMessage'] ?? '';
+          
+          // ✅ تم التعديل هنا ليتوافق مع حقل عداد الرسائل الخاص بكل مستخدم
+          int unreadCount = (data['unreadCount_$userId'] ?? 0).toInt();
 
-  /// [sendMatchNotification]: تُرسل تنبيهاً واحداً فقط عند اكتشاف عناصر جديدة في مصفوفة التطابقات.
-  Future<void> sendMatchNotification({
-    required String userId,
-    required String reportId,
-    required String category,
-    required List<String> currentMatchIds,
-  }) async {
-    // 1. جلب جميع الـ IDs التي تم التنبيه عنها مسبقاً لهذا البلاغ
-    var notifiedDocs = await _db.collection('notifications')
-        .where('receiverId', isEqualTo: userId)
-        .where('reportId', isEqualTo: reportId)
-        .where('type', isEqualTo: 'match')
-        .get();
+          if (lastSenderId != userId && unreadCount > 0 && lastMessage.isNotEmpty) {
+            String correctSenderName = (lastSenderId == data['senderId'])
+                ? (data['senderName'] ?? '')
+                : (data['receiverName'] ?? '');
 
-    Set<String> alreadyNotifiedIds = {};
-    for (var doc in notifiedDocs.docs) {
-      var data = doc.data();
-      if (data['notifiedMatchIds'] != null) {
-        alreadyNotifiedIds.addAll(List<String>.from(data['notifiedMatchIds']));
+            flutterLocalNotificationsPlugin.show(
+              change.doc.id.hashCode,
+              "رسالة جديدة من $correctSenderName",
+              lastMessage,
+              NotificationDetails(
+                android: AndroidNotificationDetails(
+                  channel.id, channel.name,
+                  channelDescription: channel.description,
+                  importance: Importance.max,
+                  priority: Priority.high,
+                  icon: '@mipmap/ic_launcher',
+                ),
+              ),
+            );
+          }
+        }
       }
-      if (data['matchedReportId'] != null) {
-        alreadyNotifiedIds.add(data['matchedReportId'] as String);
-      }
-    }
-
-    // 2. تصفية القائمة لمعرفة الـ IDs "الجديدة فقط" التي لم يسبق إرسال إشعار عنها
-    List<String> newMatchIds = currentMatchIds
-        .where((id) => id != "null" && id.isNotEmpty && !alreadyNotifiedIds.contains(id))
-        .toList();
-
-    // 3. إذا لم يوجد أي عنصر جديد، نتوقف (هذا يمنع الإشعارات الـ 3 المكررة)
-    if (newMatchIds.isEmpty) return;
-
-    // 4. إظهار إشعار "واحد" فقط للمجموعة الجديدة
-    flutterLocalNotificationsPlugin.show(
-      reportId.hashCode, // معرف ثابت للبلاغ يضمن تحديث الإشعار بدلاً من تكراره
-      "تم العثور على تطابق جديد ✨",
-      "وجدنا نتائج جديدة تطابق بلاغك ($category)، تحقّق منها الآن",
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id, channel.name,
-          importance: Importance.max,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-          groupKey: 'com.dhallah.MATCHES_GROUP',
-        ),
-      ),
-    );
-
-    // 5. حفظ مستند واحد في الفايرستور يحتوي على الـ IDs الجديدة
-    await _db.collection('notifications').add({
-      'receiverId': userId,
-      'reportId': reportId,
-      'matchedReportId': newMatchIds.first,
-      'notifiedMatchIds': newMatchIds, // قائمة العناصر الجديدة
-      'title': "تم العثور على تطابق جديد ✨",
-      'body': "وجدنا نتائج جديدة تطابق بلاغك ($category)، تحقّق منها الآن",
-      'type': 'match',
-      'createdAt': FieldValue.serverTimestamp(),
-      'isRead': false,
     });
   }
-
-
-
+///---------------------------------------------///
+/// تم حذف الداله sendMatchNotification///
+///---------------------------------------------///
 
   /// [getNotifications]: تجلب قائمة بجميع إشعارات المستخدم (رسائل، تطابقات) مرتبة من الأحدث للأقدم.
   Stream<List<NotificationModel>> getNotifications(String userId) {
@@ -252,5 +227,14 @@ class NotificationService {
     }
     await batch.commit();
   }
+/// داله جديده لزر حذف الاشعارات ///
+  Future<void> clearAllNotifications(String userId) async {
+    var snapshots = await _db.collection('notifications')
+        .where('receiverId', isEqualTo: userId)
+        .get();
 
+    for (var doc in snapshots.docs) {
+      await doc.reference.delete();
+    }
+  }
 }

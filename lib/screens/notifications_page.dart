@@ -1,3 +1,4 @@
+//last edit by rand
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -88,7 +89,6 @@ class NotificationsPage extends StatelessWidget {
     );
   }
 
-  // نافذة الخيارات (تحديد الكل كمقروء)
   void _showOptionsSheet(BuildContext context, String userId) {
     final notificationService = NotificationService();
 
@@ -103,6 +103,7 @@ class NotificationsPage extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // شريط السحب العلوي للـ BottomSheet
               Container(
                 width: 40,
                 height: 4,
@@ -112,12 +113,39 @@ class NotificationsPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
+
+              // الخيار الأول: تحديد الكل كمقروء
               ListTile(
                 leading: const Icon(Icons.check_circle_outline, color: Colors.green),
-                title: const Text("تحديد الكل كمقروء"),
+                title: const Text("تحديد الكل كمقروء",
+                    style: TextStyle(fontFamily: 'Tajawal')),
                 onTap: () async {
                   await notificationService.markAllAsRead(userId);
                   Navigator.pop(context);
+                },
+              ),
+
+              // الخيار الثاني: مسح الكل (الإضافة الجديدة)---------------
+              ListTile(
+                leading: const Icon(Icons.delete_sweep_outlined, color: Colors.redAccent),
+                title: const Text("مسح جميع الإشعارات",
+                    style: TextStyle(color: Colors.redAccent, fontFamily: 'Tajawal')),
+                onTap: () async {
+                  // استدعاء دالة الحذف من السيرفس
+                  await notificationService.clearAllNotifications(userId);
+                  Navigator.pop(context);
+
+                  // إظهار تأكيد للمستخدم
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("تم مسح الإشعارات بنجاح",
+                            textAlign: TextAlign.right,
+                            style: TextStyle(fontFamily: 'Tajawal')),
+                        backgroundColor: Colors.black87,
+                      ),
+                    );
+                  }
                 },
               ),
               const SizedBox(height: 10),
