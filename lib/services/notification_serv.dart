@@ -17,16 +17,14 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
 
 
-
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
   NotificationService._internal();
-
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
-  /// ... (إعدادات الـ Singleton)  /// [requestPermissions]: تطلب الإذن من المستخدم لإظهار الإشعارات (تنبيه، صوت، شارة).
+  /// ...  تطلب الإذن من المستخدم لإظهار الإشعارات (تنبيه، صوت، شارة).
   Future<void> requestPermissions() async {
     NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
@@ -141,11 +139,7 @@ class NotificationService {
     });
   }
 
-  /// DELETE [setupChatNotifications]: تراقب غرف الدردشة في Firestore؛ إذا وصلت رسالة جديدة ولم تُقرأ، تُظهر إشعاراً محلياً للمستخدم.
 
-
-
-  /// [sendMatchNotification]: تمر على مصفوفة التطابقات وترسل إشعاراً منفصلاً لكل تقرير جديد لم يسبق التنبيه عنه.
   /// [sendMatchNotification]: تُرسل تنبيهاً واحداً فقط عند اكتشاف عناصر جديدة في مصفوفة التطابقات.
   Future<void> sendMatchNotification({
     required String userId,
@@ -208,6 +202,8 @@ class NotificationService {
       'isRead': false,
     });
   }
+
+
 
 
   /// [getNotifications]: تجلب قائمة بجميع إشعارات المستخدم (رسائل، تطابقات) مرتبة من الأحدث للأقدم.

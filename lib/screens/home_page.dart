@@ -18,7 +18,6 @@ import 'matches_page.dart';
 import 'dart:async';
 
 
-
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
   @override
@@ -42,27 +41,21 @@ class _HomePageState extends State<HomePage> {
     _loadUserData();
   }
 
+
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
       if (mounted) setState(() => currentUid = user.uid);
-
-      // 1. تحديث التوكن لضمان المزامنة (شبكة أمان)
       await _notificationService.saveDeviceToken();
-
-      // 2. تفعيل مستمعات الإشعارات الخاصة بهذا المستخدم
-      _monitorReportsForMatches(user.uid);
+       _monitorReportsForMatches(user.uid);
       // ❌ احذفي هذا السطر لأنه لم يعد موجوداً في الخدمة:
       // _notificationService.setupChatNotifications(user.uid);
-
-      // 3. جلب بيانات الاسم
       RegularUser? userData = await _dbService.getUserById(user.uid);
       if (userData != null && mounted) {
         setState(() => userName = userData.name);
       }
     }
   }
-
 
 
   void _monitorReportsForMatches(String userId) {
@@ -102,8 +95,6 @@ class _HomePageState extends State<HomePage> {
       }
     });
   }
-
-
 
 
   @override
@@ -169,6 +160,7 @@ class _HomePageState extends State<HomePage> {
       ),
     );
   }
+
 
   Widget _buildTopBar() {
     return Row(

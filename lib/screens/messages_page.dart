@@ -7,6 +7,7 @@ import '../widgets/custom_widgets.dart';
 import '../services/message_serv.dart';
 import '../services/database_serv.dart';
 
+
 class MessagesPage extends StatefulWidget {
   final String userName;
   final String receiverId;
@@ -14,7 +15,7 @@ class MessagesPage extends StatefulWidget {
   final String senderId;
   final String reportId;
   final String receiverReportId;
-  final bool fromMatches; // 🛠️ إضافة المتغير
+  final bool fromMatches;
 
   const MessagesPage({
     super.key,
@@ -24,7 +25,7 @@ class MessagesPage extends StatefulWidget {
     required this.senderId,
     required this.reportId,
     required this.receiverReportId,
-    this.fromMatches = false, // 🛠️ افتراضياً false (للقادمين من قائمة الرسائل)
+    this.fromMatches = false,
   });
 
   @override
@@ -36,12 +37,12 @@ class _MessagesPageState extends State<MessagesPage> {
   final TextEditingController messageController = TextEditingController();
   final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
   StreamSubscription<DocumentSnapshot>? _roomListener;
-  String _myName = "مستخدم"; // ✅ أضيفي هذا السطر
+  String _myName = "مستخدم";
 
   @override
   void initState() {
     super.initState();
-    _loadMyName(); // ✅ أضيفي هذا الاستدعاء
+    _loadMyName();
     _messageService.markAsRead(widget.chatRoomId);
     _messageService.initializeChatRoom(
       chatRoomId: widget.chatRoomId,
@@ -55,13 +56,11 @@ class _MessagesPageState extends State<MessagesPage> {
       chatRoomId: widget.chatRoomId,
       onRoomDeleted: () {
         if (mounted) {
-          // 🛠️ منطق العودة المخصص
           if (widget.fromMatches) {
             Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
           } else {
             Navigator.of(context).pop();
           }
-          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
                 content: Text("تم إنهاء هذه المحادثة")),
@@ -71,7 +70,7 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
-  // ✅ أضيفي هذه الدالة
+
   Future<void> _loadMyName() async {
     final DatabaseService dbService = DatabaseService();
     final userData = await dbService.getUserById(myUid);
@@ -79,6 +78,7 @@ class _MessagesPageState extends State<MessagesPage> {
       setState(() => _myName = userData.name);
     }
   }
+
 
   void _sendMessage() async {
     if (messageController.text.trim().isEmpty) return;
@@ -89,12 +89,13 @@ class _MessagesPageState extends State<MessagesPage> {
         chatRoomId: widget.chatRoomId,
         messageText: text,
         receiverId: widget.receiverId,
-        senderName: _myName, // ✅ اسم المرسل الحالي وليس widget.userName
+        senderName: _myName,
       );
     } catch (e) {
       debugPrint("خطأ في الإرسال: $e");
     }
   }
+
 
   void _showOptionsMenu() {
     showModalBottomSheet(
@@ -139,6 +140,7 @@ class _MessagesPageState extends State<MessagesPage> {
       ),
     );
   }
+
 
   void _showCloseConfirmationDialog() {
     showDialog(
