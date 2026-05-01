@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_widgets.dart';
 import '../services/message_serv.dart';
+import '../services/database_serv.dart';
 
 class MessagesPage extends StatefulWidget {
   final String userName;
@@ -35,10 +36,12 @@ class _MessagesPageState extends State<MessagesPage> {
   final TextEditingController messageController = TextEditingController();
   final String myUid = FirebaseAuth.instance.currentUser?.uid ?? "";
   StreamSubscription<DocumentSnapshot>? _roomListener;
+  String _myName = "مستخدم"; // ✅ أضيفي هذا السطر
 
   @override
   void initState() {
     super.initState();
+    _loadMyName(); // ✅ أضيفي هذا الاستدعاء
     _messageService.markAsRead(widget.chatRoomId);
     _messageService.initializeChatRoom(
       chatRoomId: widget.chatRoomId,
@@ -68,6 +71,15 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
+  // ✅ أضيفي هذه الدالة
+  Future<void> _loadMyName() async {
+    final DatabaseService dbService = DatabaseService();
+    final userData = await dbService.getUserById(myUid);
+    if (userData != null && mounted) {
+      setState(() => _myName = userData.name);
+    }
+  }
+
   void _sendMessage() async {
     if (messageController.text.trim().isEmpty) return;
     final text = messageController.text.trim();
@@ -77,7 +89,7 @@ class _MessagesPageState extends State<MessagesPage> {
         chatRoomId: widget.chatRoomId,
         messageText: text,
         receiverId: widget.receiverId,
-        senderName: widget.userName,
+        senderName: _myName, // ✅ اسم المرسل الحالي وليس widget.userName
       );
     } catch (e) {
       debugPrint("خطأ في الإرسال: $e");

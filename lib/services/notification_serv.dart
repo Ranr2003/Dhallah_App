@@ -5,6 +5,7 @@ import '../models/notification_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 
+
 const AndroidNotificationChannel channel = AndroidNotificationChannel(
   'high_importance_channel',
   'إشعارات ضالة الهامة',
@@ -14,6 +15,7 @@ const AndroidNotificationChannel channel = AndroidNotificationChannel(
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
 FlutterLocalNotificationsPlugin();
+
 
 
 class NotificationService {
@@ -42,23 +44,36 @@ class NotificationService {
     }
   }
 
-  /// [saveDeviceToken]: تجلب رمز الجهاز (FCM Token) من جوجل وتحفظه في حساب المستخدم بـ Firestore لمراسلته لاحقاً.
+  /// [saveDeviceToken]: تحفظ التوكن لأول مرة فقط؛ إذا وجد توكن مخزن مسبقاً لا تقم بتحديثه نهائياً.
   Future<void> saveDeviceToken() async {
     try {
       String? uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) return;
 
-      String? token = await _fcm.getToken();
+      // 1. التحقق أولاً من وجود مستند للمستخدم وتوفر توكن فيه
+      DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
 
-      if (token != null) {
+      if (userDoc.exists && userDoc.data() != null) {
+        var data = userDoc.data() as Map<String, dynamic>;
+        // إذا كان حقل fcmToken موجوداً (مهما كانت قيمته)، نتوقف فوراً ولا نحدثه
+        if (data.containsKey('fcmToken') && data['fcmToken'] != null) {
+          print("ℹ️ تم العثور على توكن سابق، لن يتم التحديث بناءً على تفضيلاتك.");
+          return;
+        }
+      }
+
+      // 2. إذا لم يوجد توكن نهائياً، نقوم بجلبه وحفظه لأول مرة
+      String? newToken = await _fcm.getToken();
+      if (newToken != null) {
         await _db.collection('users').doc(uid).set({
-          'fcmToken': token,
+          'fcmToken': newToken,
           'lastTokenUpdate': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-        print("✅ تم حفظ التوكن بنجاح: $token");
+        print("✅ تم حفظ التوكن لأول مرة بنجاح.");
       }
+
     } catch (e) {
-      print("❌ خطأ في حفظ التوكن: $e");
+      print("❌ خطأ في عملية حفظ التوكن: $e");
     }
   }
 
@@ -126,46 +141,8 @@ class NotificationService {
     });
   }
 
-  /// [setupChatNotifications]: تراقب غرف الدردشة في Firestore؛ إذا وصلت رسالة جديدة ولم تُقرأ، تُظهر إشعاراً محلياً للمستخدم.
-  void setupChatNotifications(String userId) {
-    FirebaseFirestore.instance
-        .collection('chat_rooms')
-        .where('participants', arrayContains: userId)
-        .snapshots()
-        .listen((snapshot) {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.modified) {
-          var data = change.doc.data() as Map<String, dynamic>;
-          String lastSenderId = data['lastSenderId'] ?? '';
-          String lastMessage = data['lastMessage'] ?? '';
-          
-          // ✅ تم التعديل هنا ليتوافق مع حقل عداد الرسائل الخاص بكل مستخدم
-          int unreadCount = (data['unreadCount_$userId'] ?? 0).toInt();
+  /// DELETE [setupChatNotifications]: تراقب غرف الدردشة في Firestore؛ إذا وصلت رسالة جديدة ولم تُقرأ، تُظهر إشعاراً محلياً للمستخدم.
 
-          if (lastSenderId != userId && unreadCount > 0 && lastMessage.isNotEmpty) {
-            String correctSenderName = (lastSenderId == data['senderId'])
-                ? (data['senderName'] ?? '')
-                : (data['receiverName'] ?? '');
-
-            flutterLocalNotificationsPlugin.show(
-              change.doc.id.hashCode,
-              "رسالة جديدة من $correctSenderName",
-              lastMessage,
-              NotificationDetails(
-                android: AndroidNotificationDetails(
-                  channel.id, channel.name,
-                  channelDescription: channel.description,
-                  importance: Importance.max,
-                  priority: Priority.high,
-                  icon: '@mipmap/ic_launcher',
-                ),
-              ),
-            );
-          }
-        }
-      }
-    });
-  }
 
 
   /// [sendMatchNotification]: تمر على مصفوفة التطابقات وترسل إشعاراً منفصلاً لكل تقرير جديد لم يسبق التنبيه عنه.

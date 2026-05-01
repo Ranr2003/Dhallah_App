@@ -230,56 +230,27 @@ class _MatchesPageState extends State<MatchesPage> {
                   return;
                 }
 
-                // 🛠️ تعديل: استخدام DatabaseService لجلب الأسماء الحقيقية بدلاً من الـ ID
                 final DatabaseService dbService = DatabaseService();
-
-                // جلب بيانات الطرفين
                 final receiverData = await dbService.getUserById(receiverId);
-                final senderData = await dbService.getUserById(senderId);
 
                 String receiverDisplayName = receiverData?.name ?? "مستخدم";
-                String senderDisplayName = senderData?.name ?? "مستخدم";
 
-                // 1. إنشاء معرف الغرفة الموحد
                 List<String> ids = [senderId, receiverId];
                 ids.sort();
                 String chatRoomId = ids.join("_");
 
-                final chatRoomRef = FirebaseFirestore.instance
-                    .collection('chat_rooms')
-                    .doc(chatRoomId);
-
-                // 🛠️ تعديل: تخزين البيانات لضمان عدم ظهور نصوص قديمة عند إعادة المراسلة
-                await chatRoomRef.set({
-                  'participants': ids,
-                  'lastMessage': "", // تهيئة النص ليكون فارغاً في حال كانت المحادثة جديدة
-                  'timestamp': FieldValue.serverTimestamp(),
-                  'unreadCount': 0,
-
-                  // بيانات المرسل
-                  'senderId': senderId,
-                  'senderName': senderDisplayName,
-                  'senderreportId': widget.reportId,
-
-                  // بيانات المستقبل
-                  'receiverId': receiverId,
-                  'receiverName': receiverDisplayName,
-                  'receiverreportId': report.reportId,
-                }, SetOptions(merge: true));
-
-                // 2. الانتقال لصفحة الرسائل مع تمرير كافة البيانات المطلوبة
                 if (context.mounted) {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
                       builder: (context) => MessagesPage(
-                        userName: receiverDisplayName, // تمرير الاسم الحقيقي المسترجع
+                        userName: receiverDisplayName,
                         receiverId: receiverId,
                         chatRoomId: chatRoomId,
                         senderId: senderId,
                         reportId: widget.reportId,
                         receiverReportId: report.reportId ?? "",
-                        fromMatches: true, // 🛠️ تم التعديل هنا لتمرير القيمة true
+                        fromMatches: true,
                       ),
                     ),
                   );

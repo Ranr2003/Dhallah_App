@@ -52,7 +52,8 @@ class _HomePageState extends State<HomePage> {
 
       // 2. تفعيل مستمعات الإشعارات الخاصة بهذا المستخدم
       _monitorReportsForMatches(user.uid);
-      _notificationService.setupChatNotifications(user.uid);
+      // ❌ احذفي هذا السطر لأنه لم يعد موجوداً في الخدمة:
+      // _notificationService.setupChatNotifications(user.uid);
 
       // 3. جلب بيانات الاسم
       RegularUser? userData = await _dbService.getUserById(user.uid);

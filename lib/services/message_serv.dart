@@ -73,42 +73,6 @@ class MessageService {
       'timestamp': FieldValue.serverTimestamp(),
     });
 
-    await _saveMessageNotificationForReceiver(
-      receiverId: receiverId,
-      chatRoomId: chatRoomId,
-      senderName: senderName,
-      message: messageText,
-    );
-  }
-
-  /// [_saveMessageNotificationForReceiver]: تخزن مستند إشعار في Firestore للمستلم لضمان ظهور الرسالة في سجل تنبيهاته.
-  Future<void> _saveMessageNotificationForReceiver({
-    required String receiverId,
-    required String chatRoomId,
-    required String senderName,
-    required String message,
-  }) async {
-    // منع التكرار
-    var existing = await _db
-        .collection('notifications')
-        .where('receiverId', isEqualTo: receiverId)
-        .where('chatRoomId', isEqualTo: chatRoomId)
-        .where('type', isEqualTo: 'message')
-        .where('isRead', isEqualTo: false)
-        .limit(1)
-        .get();
-
-    if (existing.docs.isNotEmpty) return;
-
-    await _db.collection('notifications').add({
-      'receiverId': receiverId,
-      'title': "رسالة جديدة من $senderName",
-      'body': message,
-      'type': 'message',
-      'chatRoomId': chatRoomId,
-      'createdAt': FieldValue.serverTimestamp(),
-      'isRead': false,
-    });
   }
 
   /// [terminateConversation]: تحذف غرفة المحادثة وجميع رسائلها نهائياً، ويمكنها إغلاق البلاغات المرتبطة بها أيضاً.
