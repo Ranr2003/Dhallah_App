@@ -176,62 +176,100 @@ class NotificationService {
     required String category,
     required List<String> currentMatchIds,
   }) async {
-    // 1. جلب جميع الـ IDs التي تم التنبيه عنها مسبقاً لهذا البلاغ
-    var notifiedDocs = await _db.collection('notifications')
-        .where('receiverId', isEqualTo: userId)
-        .where('reportId', isEqualTo: reportId)
-        .where('type', isEqualTo: 'match')
-        .get();
+    try {
+      print("==============");
+      print("🚀 دخلت sendMatchNotification");
 
-    Set<String> alreadyNotifiedIds = {};
-    for (var doc in notifiedDocs.docs) {
-      var data = doc.data();
-      if (data['notifiedMatchIds'] != null) {
-        alreadyNotifiedIds.addAll(List<String>.from(data['notifiedMatchIds']));
+      // 1. تنظيف القائمة
+      List<String> validMatchIds = currentMatchIds
+          .where((id) => id != "null" && id.isNotEmpty)
+          .toList();
+
+      print("📌 validMatchIds: $validMatchIds");
+
+      if (validMatchIds.isEmpty) {
+        print("❌ القائمة فارغة، تم الإيقاف");
+        return;
       }
-      if (data['matchedReportId'] != null) {
-        alreadyNotifiedIds.add(data['matchedReportId'] as String);
+
+      // 2. إنشاء مرجع الإشعار
+      DocumentReference notifRef =
+      _db.collection('notifications').doc("match_notif_$reportId");
+
+      print("📄 notification doc id: match_notif_$reportId");
+
+      // 3. فحص هل المستند موجود
+      var lastNotification = await notifRef.get();
+
+      print("📥 notification exists: ${lastNotification.exists}");
+
+      if (lastNotification.exists) {
+        var lastData = lastNotification.data() as Map<String, dynamic>;
+
+        List<String> lastNotifiedIds =
+        List<String>.from(lastData['notifiedMatchIds'] ?? []);
+
+        print("📌 lastNotifiedIds: $lastNotifiedIds");
+
+        List<String> newMatches = validMatchIds.where((id) {
+          return !lastNotifiedIds.contains(id);
+        }).toList();
+
+        print("🆕 newMatches: $newMatches");
+
+        if (newMatches.isEmpty) {
+          print("🚫 لا توجد تطابقات جديدة → إيقاف");
+          return;
+        }
+
+        print("✨ يوجد تطابقات جديدة → سيتم إرسال إشعار");
       }
-    }
 
-    // 2. تصفية القائمة لمعرفة الـ IDs "الجديدة فقط" التي لم يسبق إرسال إشعار عنها
-    List<String> newMatchIds = currentMatchIds
-        .where((id) => id != "null" && id.isNotEmpty && !alreadyNotifiedIds.contains(id))
-        .toList();
+      print("💾 سيتم حفظ الإشعار الآن...");
 
-    // 3. إذا لم يوجد أي عنصر جديد، نتوقف (هذا يمنع الإشعارات الـ 3 المكررة)
-    if (newMatchIds.isEmpty) return;
+      // 4. حفظ الإشعار في Firestore
+      await notifRef.set({
+        'receiverId': userId,
+        'reportId': reportId,
 
-    // 4. إظهار إشعار "واحد" فقط للمجموعة الجديدة
-    flutterLocalNotificationsPlugin.show(
-      reportId.hashCode, // معرف ثابت للبلاغ يضمن تحديث الإشعار بدلاً من تكراره
-      "تم العثور على تطابق جديد ✨",
-      "وجدنا نتائج جديدة تطابق بلاغك ($category)، تحقّق منها الآن",
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id, channel.name,
-          importance: Importance.max,
-          priority: Priority.high,
-          icon: '@mipmap/ic_launcher',
-          groupKey: 'com.dhallah.MATCHES_GROUP',
+        // مهم جدًا لصفحة الإشعارات
+        'title': "تطابق جديد لبلاغ $category ✨",
+        'body': "وجدنا نتائج جديدة تطابق مواصفات بلاغك، تفقدها الآن.",
+
+        'notifiedMatchIds': validMatchIds,
+        'type': 'match',
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+      }, SetOptions(merge: true));
+
+      print("✅ تم حفظ الإشعار في Firestore بنجاح");
+
+      // 5. إظهار Local Notification
+      int notificationId = reportId.hashCode;
+
+      await flutterLocalNotificationsPlugin.show(
+        notificationId,
+        "تطابق جديد لبلاغ $category ✨",
+        "وجدنا نتائج جديدة تطابق مواصفات بلاغك، تفقدها الآن.",
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            'matches_channel_id',
+            'Matches Notifications',
+            importance: Importance.max,
+            priority: Priority.high,
+            groupKey: 'com.dhallah.MATCHES_GROUP',
+          ),
         ),
-      ),
-    );
+      );
 
-    // 5. حفظ مستند واحد في الفايرستور يحتوي على الـ IDs الجديدة
-    await _db.collection('notifications').add({
-      'receiverId': userId,
-      'reportId': reportId,
-      'matchedReportId': newMatchIds.first,
-      'notifiedMatchIds': newMatchIds, // قائمة العناصر الجديدة
-      'title': "تم العثور على تطابق جديد ✨",
-      'body': "وجدنا نتائج جديدة تطابق بلاغك ($category)، تحقّق منها الآن",
-      'type': 'match',
-      'createdAt': FieldValue.serverTimestamp(),
-      'isRead': false,
-    });
+      print("🔔 تم إظهار الإشعار المحلي");
+      print("==============");
+    } catch (e, stackTrace) {
+      print("❌ خطأ داخل sendMatchNotification");
+      print(e);
+      print(stackTrace);
+    }
   }
-
 
   /// [getNotifications]: تجلب قائمة بجميع إشعارات المستخدم (رسائل، تطابقات) مرتبة من الأحدث للأقدم.
   Stream<List<NotificationModel>> getNotifications(String userId) {

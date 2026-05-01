@@ -9,6 +9,7 @@ class NotificationModel {
   final DateTime createdAt;
   final String type;
   final bool isRead;
+  final List<String> notifiedMatchIds; // الحقل الجديد المضاف هنا
 
   NotificationModel({
     required this.id,
@@ -19,6 +20,7 @@ class NotificationModel {
     required this.createdAt,
     required this.type,
     this.isRead = false,
+    this.notifiedMatchIds = const [], // قيمة افتراضية فارغة
   });
 
   factory NotificationModel.fromMap(Map<String, dynamic> map, String id) {
@@ -30,6 +32,10 @@ class NotificationModel {
       body: map['body'] ?? '',
       isRead: map['isRead'] ?? false,
       type: map['type'] ?? '',
+      // تأكدي من تحويل البيانات القادمة من Firestore إلى قائمة نصوص بشكل آمن
+      notifiedMatchIds: map['notifiedMatchIds'] != null
+          ? List<String>.from(map['notifiedMatchIds'])
+          : [],
       createdAt: (map['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
