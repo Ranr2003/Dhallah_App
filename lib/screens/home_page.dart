@@ -63,33 +63,45 @@ class _HomePageState extends State<HomePage> {
         .collection('reports')
         .where('userId', isEqualTo: userId)
         .where('ai_status', isEqualTo: 'completed')
+        .where('status', isEqualTo: 'open') // ✅ أضيفي هذا السطر هنا
         .snapshots()
         .listen((snapshot) async {
       for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added ||
-            change.type == DocumentChangeType.modified) {
 
-          var reportData = change.doc.data() as Map<String, dynamic>;
-          List matches = reportData['matches'] ?? [];
-          String reportId = change.doc.id;
-          String category = reportData['item']['category'] ?? 'عنصر';
+        var reportData = change.doc.data() as Map<String, dynamic>;
 
-          if (matches.isNotEmpty) {
-            List<String> matchIds = matches.map((m) {
-              if (m is Map) {
-                return (m['matched_report_id'] ?? m['reportId'] ?? m['id'] ?? "").toString();
-              }
-              return m.toString();
-            }).where((id) => id.isNotEmpty && id != "null").toList();
+        String status = reportData['status'] ?? '';
+        String aiStatus = reportData['ai_status'] ?? '';
 
-            if (matchIds.isNotEmpty) {
-              await _notificationService.sendMatchNotification(
-                userId: userId,
-                reportId: reportId,
-                category: category,
-                currentMatchIds: matchIds,
-              );
+        // 🚨 أهم شرط يمنع الإشعارات عند الإغلاق
+        if (status != 'open') {
+          print("🚫 البلاغ مغلق - تم تجاهله: ${change.doc.id}");
+          continue;
+        }
+
+        if (aiStatus != 'completed') {
+          continue;
+        }
+
+        List matches = reportData['matches'] ?? [];
+        String reportId = change.doc.id;
+        String category = reportData['item']['category'] ?? 'عنصر';
+
+        if (matches.isNotEmpty) {
+          List<String> matchIds = matches.map((m) {
+            if (m is Map) {
+              return (m['matched_report_id'] ?? m['reportId'] ?? m['id'] ?? "").toString();
             }
+            return m.toString();
+          }).where((id) => id.isNotEmpty && id != "null").toList();
+
+          if (matchIds.isNotEmpty) {
+            await _notificationService.sendMatchNotification(
+              userId: userId,
+              reportId: reportId,
+              category: category,
+              currentMatchIds: matchIds,
+            );
           }
         }
       }

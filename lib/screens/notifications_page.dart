@@ -73,6 +73,7 @@ class NotificationsPage extends StatelessWidget {
               }
 
               return Column(
+                key: ValueKey(notify.id), // استخدام ID المستند كـ Key
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   if (showDateLabel) _buildDateLabel(notify.createdAt),
