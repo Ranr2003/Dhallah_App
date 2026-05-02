@@ -1,1 +1,49 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"dhallahapp","appId":"1:985980050849:android:c9c5e46dd256069992ffe0","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"dhallahapp","configurations":{"android":"1:985980050849:android:c9c5e46dd256069992ffe0","ios":"1:985980050849:ios:b4826c232ef2f86492ffe0","web":"1:985980050849:web:3d65ad8d27d02bc992ffe0"}}}}}}
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "dhallahapp",
+          "appId": "1:985980050849:android:c9c5e46dd256069992ffe0",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "dhallahapp",
+          "configurations": {
+            "android": "1:985980050849:android:c9c5e46dd256069992ffe0",
+            "ios": "1:985980050849:ios:b4826c232ef2f86492ffe0",
+            "web": "1:985980050849:web:3d65ad8d27d02bc992ffe0"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "source": "functions"
+    },
+    {
+      "source": "cloud_functions",
+      "codebase": "functions",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ]
+}

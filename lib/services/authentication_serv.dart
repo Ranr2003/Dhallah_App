@@ -1,4 +1,4 @@
-// authentication_serv.dart
+// authentication_serv.dart  // اضفته من برانش ليلى
 // Rand
 // ---------------------------------------------------------
 //  (اولا) استيراد الباكجيز
@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'database_serv.dart';
 import '../models/user_model.dart';
+import 'notification_serv.dart'; // ✅ استيراد خدمة الإشعارات
 
 // ---------------------------------------------------------
 //  (ثانيا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
@@ -15,6 +16,8 @@ class AuthenticationService {
   final fb.FirebaseAuth _auth = fb.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final DatabaseService _dbService = DatabaseService();
+  final NotificationService _notificationService = NotificationService(); // ✅ تعريف الخدمة
+
   // --- حفظ/تحديث المستخدم في Firestore ---
   // نستخدم merge: true لضمان عدم مسح البيانات القديمة
   Future<void> _saveUserData(fb.User user, {String? providedName, String? provider}) async {
@@ -217,19 +220,19 @@ class AuthenticationService {
 
   Future<void> logout() async {
     try {
-      // نضع خروج قوقل داخل try-catch منفصل لأنه أحياناً يعلق إذا لم يكن المستخدم داخلاً بقوقل أصلاً
+      // ✅ الخطوة الأهم: حذف التوكن من السيرفر والجهاز قبل الخروج الفعلي
+      //await _notificationService.deleteDeviceToken();
+
       try {
         await _googleSignIn.signOut();
       } catch (e) {
-        print("Google SignOut Error: $e"); // تجاهل الخطأ واكمل
+        print("Google SignOut Error: $e");
       }
 
-      // الخروج الأساسي من فايربيس
       await _auth.signOut();
       print("User logged out successfully");
     } catch (e) {
       print("Logout Error: $e");
-      // حتى لو صار خطأ، نحاول نخرج من فايربيس كحل أخير
       await _auth.signOut();
     }
   }

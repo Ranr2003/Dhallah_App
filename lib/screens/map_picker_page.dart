@@ -1,4 +1,3 @@
-// lib/screens/map_picker_page.dart
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -19,12 +18,7 @@ class PickedLocation {
     required this.extraDetails,
   });
 
-  String get fullAddress {
-    if (extraDetails.isNotEmpty) {
-      return '$autoAddress — $extraDetails';
-    }
-    return autoAddress;
-  }
+  String get fullAddress => extraDetails.isNotEmpty ? '$autoAddress — $extraDetails' : autoAddress;
 }
 
 class MapPickerPage extends StatefulWidget {
@@ -34,312 +28,217 @@ class MapPickerPage extends StatefulWidget {
 }
 
 class _MapPickerPageState extends State<MapPickerPage> {
-  LatLng _selectedLocation = const LatLng(24.7136, 46.6753);
-  String _autoAddress = 'حرّك الخريطة لتحديد الموقع';
-  String? _countryCode;
-  bool _isLoadingAddress = false;
-  final TextEditingController _extraDetailsController = TextEditingController();
-  final MapController _mapController = MapController();
+  LatLng _selectedCoordinates = const LatLng(24.7136, 46.6753);
+  String _readableAddress = 'حرّك الخريطة لتحديد الموقع';
+  String? _detectedCountryCode;
+  bool _isFetchingAddress = false;
+  final TextEditingController _additionalDetailsController = TextEditingController();
+  final MapController _flutterMapController = MapController();
 
   @override
   void initState() {
     super.initState();
-    _goToCurrentLocation();
+    _determineInitialUserLocation();
   }
 
   @override
   void dispose() {
-    _extraDetailsController.dispose();
+    _additionalDetailsController.dispose();
+    _flutterMapController.dispose();
     super.dispose();
-  }
-
-  void _onConfirm() {
-    if (_isLoadingAddress) return;
-    if (!(_countryCode == 'sa') ) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Directionality(
-                textDirection: TextDirection.rtl,
-                 child: Text('عذراً، يجب اختيار موقع داخل المملكة العربية السعودية 🇸🇦',
-                         style: TextStyle(
-                            fontFamily: 'Tajawal'
-                         ),
-                 ),
-          ),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-    Navigator.pop(context,
-                 PickedLocation(
-                    coordinates: _selectedLocation,
-                    autoAddress: _autoAddress,
-                    extraDetails: _extraDetailsController.text.trim(),
-                 ),
-    );
-  }
-
-  Future<void> _goToCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      _fetchAddress(_selectedLocation);
-      return;
-    }
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-    }
-
-    if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
-      _fetchAddress(_selectedLocation);
-      return;
-    }
-
-    try {
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
-
-      LatLng currentLocation = LatLng(position.latitude, position.longitude);
-      _mapController.move(currentLocation, 15.0);
-      setState(() {
-        _selectedLocation = currentLocation;
-      });
-
-      _fetchAddress(currentLocation);
-    } catch (e) {
-      _fetchAddress(_selectedLocation);
-    }
-  }
-
-
-  Future<void> _fetchAddress(LatLng location) async {
-    setState(() {
-      _isLoadingAddress = true;
-      _countryCode = null;
-    });
-
-    try {
-      // بناء رابط الـ API
-      Uri url = Uri.parse(
-        'https://nominatim.openstreetmap.org/reverse'
-            '?lat=${location.latitude}'
-            '&lon=${location.longitude}'
-            '&format=json'
-            '&accept-language=ar',
-      );
-      http.Response response = await http.get(
-        url,
-        headers: {'User-Agent': 'DhallahApp/1.0'},
-      ).timeout(const Duration(seconds: 5));
-
-      if (response.statusCode == 200) {
-        Map<String, dynamic> data = jsonDecode(response.body);
-
-        // لو الـ API رجّع خطأ (مثلاً موقع في البحر)
-        if (data['error'] != null) {
-          setState(() {
-            _autoAddress = 'موقع خارج النطاق';
-            _countryCode = 'unknown';
-          });
-          return;
-        }
-
-        Map<String, dynamic> address = data['address'];
-
-        setState(() {
-          _countryCode = address['country_code']?.toString().toLowerCase();
-          List<String> parts = [];
-          if (address['road'] != null)          parts.add(address['road']);
-          if (address['neighbourhood'] != null) parts.add(address['neighbourhood']);
-          if (address['suburb'] != null)        parts.add(address['suburb']);
-
-          String? city = address['city'] ?? address['town'] ?? address['village'];
-          if (city != null) parts.add(city);
-
-          if (parts.isNotEmpty) {
-            _autoAddress = parts.take(3).join('، ');
-          } else {
-
-            _autoAddress =
-                data['display_name']?.split(',').take(2).join('،') ?? 'موقع غير محدد';
-            }
-        });
-      } else {
-        setState(() => _autoAddress = 'تعذّر تحديد العنوان');
-      }
-    } catch (e) {
-      setState(() => _autoAddress = 'تأكد من اتصالك بالإنترنت');
-    } finally {
-      if (mounted) {
-        setState(() => _isLoadingAddress = false);
-      }
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-             appBar: AppBar(
-                     title: Text('تحديد الموقع على الخريطة'),
-                     foregroundColor: Colors.white,
-                     centerTitle: true,
-                     automaticallyImplyLeading: false,
-                     flexibleSpace: Container(
-                           decoration: BoxDecoration(
-                                 gradient: kPrimaryGradient,
-                           ),
-                     ),
-                     actions: [
-                                IconButton(
-                                      icon: Icon(Icons.arrow_forward_ios_rounded),
-                                      color: Colors.white,
-                                      onPressed: () => Navigator.of(context).pop(),
-                                ),
-                     ],
-             ),
-             body: Column(
-                          children: [
-                                   Expanded(
-                                      child: Stack(
-                                              children: [
-                                                         _buildMap(),
-                                                          const _CenterPin(),
-                                              ],
-                                      ),
-                                   ),
-                                   _buildBottomCard(),
-                          ],
-             ),
-    );
-  }
-
-  Widget _buildMap() {
-    return FlutterMap(
-             mapController: _mapController,
-             options: MapOptions(
-                          initialCenter: _selectedLocation,
-                          initialZoom: 15.0,
-                          minZoom: 5.0,
-                          maxZoom: 18.0,
-                          onPositionChanged: (position, hasGesture) {
-                                 if (hasGesture) {
-                                   _selectedLocation = position.center;
-                                 }
-                          },
-                          onMapEvent: (event) {
-                               if (event is MapEventMoveEnd) {
-                                      _fetchAddress(_selectedLocation);
-                               }
-                          },
-             ),
-             children: [
-                   TileLayer(
-                       urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                       userAgentPackageName: 'com.dhallah.app',
-                   ),
-             ],
-    );
-  }
-
-  Widget _buildBottomCard() {
-    return Container(
-             padding: EdgeInsets.all(20),
-             decoration: BoxDecoration(
-                    color: AppColors.white,
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black12,
-                          blurRadius: 10
-                      )
-                    ],
-                    borderRadius: BorderRadius.vertical(
-                           top: Radius.circular(AppDimens.radiusSheet),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text(
+          "الخريطة",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        automaticallyImplyLeading: false,
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: AppColors.primary,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.arrow_forward_ios, size: 20, color:Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                FlutterMap(
+                  mapController: _flutterMapController,
+                  options: MapOptions(
+                    initialCenter: _selectedCoordinates,
+                    initialZoom: 15.0,
+                    onPositionChanged: (cameraPosition, hasGesture) {
+                      if (hasGesture) {
+                        _selectedCoordinates = cameraPosition.center;
+                      }
+                    },
+                    onMapEvent: (mapEvent) {
+                      if (mapEvent is MapEventMoveEnd) {
+                        _convertCoordinatesToAddress(_selectedCoordinates);
+                      }
+                    },
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      userAgentPackageName: 'com.dhallah.app',
                     ),
-             ),
-             child: Column(
-                       mainAxisSize: MainAxisSize.min,
-                       children: [
-                                   Row(
-                                      textDirection: TextDirection.rtl,
-                                      children: [
-                                           Icon(Icons.location_on,
-                                               color: AppColors.primary,
-                                               size: 24
-                                           ), SizedBox(width: AppDimens.spaceSm),
-                                           Expanded(
-                                               child: _isLoadingAddress ?  LinearProgressIndicator(
-                                                                                 color: AppColors.primary,
-                                                                                 backgroundColor: AppColors.secondary,
-                                                                                 minHeight: 2,
-                                                                          ) : Text(
-                                                                               _autoAddress,
-                                                                               style: TextStyle(
-                                                                                        fontWeight: FontWeight.bold,
-                                                                                        fontSize: 14,
-                                                                                        color: AppColors.textPrimary,
-                                                                               ),
-                                                                               textAlign: TextAlign.right,
-                                                                               maxLines: 2,
-                                                                               overflow: TextOverflow.ellipsis,
-                                                                          ),
-                                           ),
-                                      ],
-                                   ), SizedBox(height: AppDimens.spaceMd),
-                                   Directionality(
-                                      textDirection: TextDirection.rtl,
-                                      child: TextField(
-                                          controller: _extraDetailsController,
-                                          style: TextStyle(
-                                              fontSize: 13,
-                                              color: AppColors.textPrimary
-                                          ),
-                                          decoration: InputDecoration(
-                                                           hintText: 'تفاصيل إضافية (مثال: الجامعة، مبنى C الدور الثاني...)',
-                                                           hintStyle: TextStyle(
-                                                               fontSize: 13,
-                                                               color: AppColors.textHint
-                                                           ),
-                                                           filled: true,
-                                                           fillColor: AppColors.fieldBg,
-                                                           contentPadding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12,
-                                                            ),
-                                                           border: OutlineInputBorder(
-                                                                   borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
-                                                                   borderSide: BorderSide.none,
-                                                           ),
-                                          ),
-                                     ),
-                                   ), SizedBox(height: AppDimens.spaceMd),
-                                  WaterRippleButton(
-                           text: 'تأكيد هذا الموقع',
-                           onTap: _onConfirm,
-                         ),
-
-                       ],
-             ),
+                  ],
+                ),
+                const IgnorePointer(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 35),
+                    child: Icon(Icons.location_pin, color: AppColors.mapPin, size: 48),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 20, offset: const Offset(0, -5))],
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  textDirection: TextDirection.rtl,
+                  children: [
+                    const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _isFetchingAddress
+                          ? const LinearProgressIndicator(minHeight: 2, color: AppColors.primary)
+                          : Text(
+                        _readableAddress,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textPrimary, fontFamily: 'Tajawal'),
+                        textAlign: TextAlign.right,
+                        maxLines: 2,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: TextField(
+                    controller: _additionalDetailsController,
+                    style: const TextStyle(fontFamily: 'Tajawal', fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText:  'تفاصيل إضافية (مثال: الجامعة، مبنى C الدور الثاني...)',
+                      hintStyle: const TextStyle(fontSize: 13, color: AppColors.textHint),
+                      prefixIcon: const Icon(Icons.edit_note_rounded, color: AppColors.primary),
+                      filled: true,
+                      fillColor: AppColors.fieldBg,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 25),
+                WaterRippleButton(
+                  text: 'تأكيد الموقع الحالي',
+                  onTap: _validateAndReturnLocation,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
-}
 
-class _CenterPin extends StatelessWidget {
-  const _CenterPin();
+  Future<void> _determineInitialUserLocation() async {
+    bool enabled = await Geolocator.isLocationServiceEnabled();
+    LocationPermission perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.denied) perm = await Geolocator.requestPermission();
 
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-             child: Center(
-                      child: Padding(
-                          padding: const EdgeInsets.only(bottom: 35),
-                          child: Icon(Icons.location_pin,
-                                 color: AppColors.mapPin,
-                                 size: 45,
-                          ),
-                      ),
-             ),
+    if (enabled && perm != LocationPermission.deniedForever) {
+      try {
+        Position pos = await Geolocator.getCurrentPosition();
+        LatLng latLng = LatLng(pos.latitude, pos.longitude);
+        _flutterMapController.move(latLng, 15.0);
+        setState(() => _selectedCoordinates = latLng);
+        _convertCoordinatesToAddress(latLng);
+      } catch (_) {
+        _convertCoordinatesToAddress(_selectedCoordinates);
+      }
+    }
+  }
+
+  Future<void> _convertCoordinatesToAddress(LatLng location) async {
+    if (!mounted) return;
+    setState(() => _isFetchingAddress = true);
+
+    try {
+      final res = await http.get(
+          Uri.parse('https://nominatim.openstreetmap.org/reverse?lat=${location.latitude}&lon=${location.longitude}&format=json&accept-language=ar'),
+          headers: {'User-Agent': 'DhallahApp/1.0'}
+      ).timeout(const Duration(seconds: 5));
+
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        final addr = data['address'] as Map<String, dynamic>?;
+
+        setState(() {
+          _detectedCountryCode = addr?['country_code']?.toString().toLowerCase();
+          final List<String> parts = [
+            if (addr?['road'] != null) addr!['road'],
+            if (addr?['neighbourhood'] != null) addr!['neighbourhood'],
+            if (addr?['city'] != null || addr?['town'] != null) (addr?['city'] ?? addr?['town']),
+          ];
+
+          _readableAddress = parts.isNotEmpty ? parts.take(2).join('، ') : 'موقع غير محدد';
+        });
+      }
+    } catch (e) {
+      setState(() => _readableAddress = 'تأكد من اتصالك بالإنترنت');
+    } finally {
+      if (mounted) setState(() => _isFetchingAddress = false);
+    }
+  }
+
+  void _validateAndReturnLocation() {
+    if (_isFetchingAddress) return;
+    if (_detectedCountryCode != 'sa') {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('يجب اختيار موقع داخل السعودية 🇸🇦',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontFamily: 'Tajawal'
+                  )
+              ),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating
+          )
+      );
+      return;
+    }
+    Navigator.pop(
+      context,
+      PickedLocation(
+          coordinates: _selectedCoordinates,
+          autoAddress: _readableAddress,
+          extraDetails: _additionalDetailsController.text.trim()
+      ),
     );
   }
 }

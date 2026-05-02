@@ -1,4 +1,4 @@
-// account_info_page.dart
+// account_info_page.dart  // اضفته من برانش ليلى
 // Updated by Gemini for Rand - Dhallah Project
 
 import 'package:flutter/material.dart';
