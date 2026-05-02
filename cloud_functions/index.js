@@ -94,8 +94,8 @@ exports.sendReportClosedNotification = onDocumentUpdated('reports/{reportId}', a
             if (!userDoc.exists) return null;
 
             const fcmToken = userDoc.data().fcmToken;
-            const title = "تم إغلاق البلاغ بنجاح 🎉";
-            const body = "سعداء جداً لأنك وجدت غرضك! شكراً لاستخدامك ضالة ، ونتمنى لك يوماً سعيداً.";
+            const title = "تم إغلاق البلاغ بنجاح ";
+            const body = " شكراً لاستخدامك ضالة ، ونتمنى لك يوماً سعيداً";
 
             // حفظ في قائمة الإشعارات
             await admin.firestore().collection('notifications').add({
