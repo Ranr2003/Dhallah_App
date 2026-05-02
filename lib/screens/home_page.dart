@@ -1,8 +1,7 @@
-//last edit by rand
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import '../services/item_serv.dart';
+import '../services/report_serv.dart';
 import '../services/authentication_serv.dart';
 import '../services/database_serv.dart';
 import '../services/notification_serv.dart';
@@ -28,7 +27,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  final ItemService _itemService = ItemService();
+  final ReportService _reportService = ReportService();
   final AuthenticationService _authService = AuthenticationService();
   final DatabaseService _dbService = DatabaseService();
   final NotificationService _notificationService = NotificationService();
@@ -48,17 +47,12 @@ class _HomePageState extends State<HomePage> {
     if (user != null) {
       if (mounted) setState(() => currentUid = user.uid);
       await _notificationService.saveDeviceToken();
-       // _monitorReportsForMatches(user.uid);
-      // ❌ احذفي هذا السطر لأنه لم يعد موجوداً في الخدمة:
-      // _notificationService.setupChatNotifications(user.uid);
       RegularUser? userData = await _dbService.getUserById(user.uid);
       if (userData != null && mounted) {
         setState(() => userName = userData.name);
       }
     }
   }
-
-/// حذف الداله _monitorReportsForMatches///
 
 
   @override
@@ -100,7 +94,7 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: (currentUid.isEmpty) ? _buildGuestEmptyState()
                           : StreamBuilder<List<Report>>(
-                        stream: _itemService.getUserReportsStream(currentUid),
+                        stream: _reportService.getUserReportsStream(currentUid),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: AppColors.primary));
                           if (snapshot.hasError) return const Center(child: Text("حدث خطأ في تحميل البيانات"));
@@ -243,7 +237,7 @@ class _HomePageState extends State<HomePage> {
       key: Key(report.reportId ?? ''),
       direction: DismissDirection.startToEnd,
       confirmDismiss: (_) => _showDeleteConfirmation(context),
-      onDismissed: (_) => _itemService.deleteReport(report.reportId!, report.item.imageURL),
+      onDismissed: (_) => _reportService.deleteReport(report.reportId!, report.item.imageURL),
       background: Container(
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 20),

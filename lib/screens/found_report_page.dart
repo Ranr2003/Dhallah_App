@@ -3,7 +3,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:awesome_dialog/awesome_dialog.dart';
 import '../models/item_model.dart';
 import '../models/report_model.dart';
-import '../services/item_serv.dart';
+import '../services/report_serv.dart';
 import '../widgets/custom_widgets.dart';
 import 'map_picker_page.dart';
 import '../utils/app_theme.dart';
@@ -18,7 +18,7 @@ class FoundReportPage extends StatefulWidget {
 
 
 class _FoundReportPageState extends State<FoundReportPage> {
-  final ItemService _itemService = ItemService();
+  final ReportService _reportService = ReportService();
   final AuthenticationService _authService = AuthenticationService();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _typeController  = TextEditingController();
@@ -160,7 +160,7 @@ class _FoundReportPageState extends State<FoundReportPage> {
         createdAt: DateTime.now(),
       );
 
-      await _itemService.submitReport(report, _selectedImage);
+      await _reportService.submitReport(report, _selectedImage);
       _showNotice(isSuccess: true);
     } catch (e) {
       _showNotice(isSuccess: false, error: e.toString());

@@ -1,7 +1,7 @@
-import 'package:dhallah_app/utils/app_theme.dart'; // اضفته من برانش ليلى
+import 'package:dhallah_app/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 import '../services/admin_serv.dart';
-import '../services/item_serv.dart';
+import '../services/report_serv.dart';
 import '../models/user_model.dart';
 import '../models/report_model.dart';
 
@@ -15,7 +15,7 @@ class AdminDashboard extends StatefulWidget {
 
 class _AdminDashboardState extends State<AdminDashboard> {
   final AdminService _adminService = AdminService();
-  final ItemService _itemService = ItemService();
+  final ReportService _reportService = ReportService();
 
   @override
   Widget build(BuildContext context) {
@@ -345,7 +345,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
 
   Widget _buildReportsManagement() {
     return StreamBuilder<List<Report>>(
-      stream: _itemService.getAllReportsStream(),
+      stream: _reportService.getAllReportsStream(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
         final reports = snapshot.data!;

@@ -1,10 +1,9 @@
-//last edit by rand
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import '../models/report_model.dart';
 import '../services/database_serv.dart';
-import '../services/item_serv.dart';
+import '../services/report_serv.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_widgets.dart';
 import 'messages_page.dart';
@@ -27,11 +26,12 @@ class MatchesPage extends StatefulWidget {
 
 class _MatchesPageState extends State<MatchesPage> {
   final Map<String, Report?> _reportCache = {};
-  final ItemService _service = ItemService();
+  final ReportService _reportService = ReportService();
+  final DatabaseService dbService = DatabaseService();
 
   Future<Report?> _getReport(String id) async {
     if (!_reportCache.containsKey(id)) {
-      _reportCache[id] = await _service.fetchReportById(id);
+      _reportCache[id] = await _reportService.fetchReportById(id);
     }
     return _reportCache[id];
   }
@@ -220,7 +220,7 @@ class _MatchesPageState extends State<MatchesPage> {
             WaterRippleButton(
               text: 'تواصل الآن',
               height: 40,
-              onTap: () async {  // ---------تعديلي كان هنا حتى لايطردني من المحادثه
+              onTap: () async {
                 final receiverId = report.userId;
                 final senderId = widget.currentUid;
 
@@ -231,17 +231,14 @@ class _MatchesPageState extends State<MatchesPage> {
                   return;
                 }
 
-                // 1. إنشاء معرف الغرفة
                 List<String> ids = [senderId, receiverId];
                 ids.sort();
                 String chatRoomId = ids.join("_");
 
-                // 2. التحقق من وجود الغرفة أو إنشاؤها (هذا هو السطر المنقذ)
                 final chatRoomDoc = FirebaseFirestore.instance.collection('chat_rooms').doc(chatRoomId);
                 final docSnapshot = await chatRoomDoc.get();
 
                 if (!docSnapshot.exists) {
-                  // إذا كانت الغرفة غير موجودة، ننشئها ببيانات أولية لتجنب خطأ NOT_FOUND
                   await chatRoomDoc.set({
                     'users': ids,
                     'lastMessage': '',
@@ -250,8 +247,7 @@ class _MatchesPageState extends State<MatchesPage> {
                   });
                 }
 
-                // 3. الآن نجلب اسم المستلم وننتقل بأمان
-                final DatabaseService dbService = DatabaseService();
+
                 final receiverData = await dbService.getUserById(receiverId);
                 String receiverDisplayName = receiverData?.name ?? "مستخدم";
 
