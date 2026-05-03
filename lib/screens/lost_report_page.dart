@@ -132,15 +132,6 @@ class _LostReportPageState extends State<LostReportPage> {
     bool hasImage = _selectedImage != null;
 
     if (!isFormValid || !hasLocation || !hasImage) {
-      if (!hasLocation && isFormValid && hasImage) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('يرجى تحديد الموقع من الخريطة',
-              textAlign: TextAlign.right
-          ),
-          backgroundColor: AppColors.error
-          ),
-        );
-      }
       return;
     }
     setState(() => _isPublishing = true);
