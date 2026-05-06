@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui' as ui;
 import '../models/report_model.dart';
@@ -7,6 +6,8 @@ import '../services/report_serv.dart';
 import '../utils/app_theme.dart';
 import '../widgets/custom_widgets.dart';
 import 'messages_page.dart';
+import '../services/message_serv.dart';
+
 
 class MatchesPage extends StatefulWidget {
   final List<dynamic> matches;
@@ -28,7 +29,7 @@ class _MatchesPageState extends State<MatchesPage> {
   final Map<String, Report?> _reportCache = {};
   final ReportService _reportService = ReportService();
   final DatabaseService dbService = DatabaseService();
-
+  final MessageService _messageService = MessageService();
   Future<Report?> _getReport(String id) async {
     if (!_reportCache.containsKey(id)) {
       _reportCache[id] = await _reportService.fetchReportById(id);
@@ -81,7 +82,10 @@ class _MatchesPageState extends State<MatchesPage> {
           Align(
             alignment: Alignment.centerRight,
             child: IconButton(
-              icon: const Icon(Icons.arrow_back_ios, size: 20, color: AppColors.primaryDark),
+              icon: const Icon(Icons.arrow_back_ios,
+                  size: 20,
+                  color: AppColors.primaryDark
+              ),
               onPressed: () => Navigator.pop(context),
             ),
           ),
@@ -149,7 +153,7 @@ class _MatchesPageState extends State<MatchesPage> {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFD2B4EC).withOpacity(0.15),
+            color: const Color(0xFFD2B4EC).withValues(alpha: 0.15),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -177,7 +181,10 @@ class _MatchesPageState extends State<MatchesPage> {
         errorBuilder: (context, error, stackTrace) => Container(
           width: 115,
           color: Colors.grey[100],
-          child: const Icon(Icons.image_not_supported, color: Colors.grey, size: 30),
+          child: const Icon(Icons.image_not_supported,
+              color: Colors.grey,
+              size: 30
+          ),
         ),
       ),
     );
@@ -221,52 +228,50 @@ class _MatchesPageState extends State<MatchesPage> {
               text: 'تواصل الآن',
               height: 40,
               onTap: () async {
+                final navigator = Navigator.of(context);
+                final scaffoldMessenger = ScaffoldMessenger.of(context);
+
                 final receiverId = report.userId;
                 final senderId = widget.currentUid;
 
                 if (receiverId == "unknown" || receiverId == senderId) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  scaffoldMessenger.showSnackBar(
                     const SnackBar(content: Text("لا يمكن بدء محادثة مع هذا المستخدم")),
                   );
                   return;
                 }
 
-                List<String> ids = [senderId, receiverId];
-                ids.sort();
-                String chatRoomId = ids.join("_");
-
-                final chatRoomDoc = FirebaseFirestore.instance.collection('chat_rooms').doc(chatRoomId);
-                final docSnapshot = await chatRoomDoc.get();
-
-                if (!docSnapshot.exists) {
-                  await chatRoomDoc.set({
-                    'users': ids,
-                    'lastMessage': '',
-                    'timestamp': FieldValue.serverTimestamp(),
-                    'unseenCount': {senderId: 0, receiverId: 0},
-                  });
-                }
-
+                List<String> participants = [senderId, receiverId]..sort();
+                List<String> reportIds = [widget.reportId, report.reportId ?? ""]..sort();
+                String chatRoomId = "chat_${participants.join("_")}_${reportIds.join("_")}";
 
                 final receiverData = await dbService.getUserById(receiverId);
                 String receiverDisplayName = receiverData?.name ?? "مستخدم";
 
-                if (context.mounted) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MessagesPage(
-                        userName: receiverDisplayName,
-                        receiverId: receiverId,
-                        chatRoomId: chatRoomId,
-                        senderId: senderId,
-                        reportId: widget.reportId,
-                        receiverReportId: report.reportId ?? "",
-                        fromMatches: true,
-                      ),
+                await _messageService.initializeChatRoom(
+                  chatRoomId: chatRoomId,
+                  senderId: senderId,
+                  receiverId: receiverId,
+                  reportId: widget.reportId,
+                  receiverReportId: report.reportId ?? "",
+                  userName: receiverDisplayName,
+                );
+
+                if (!mounted) return;
+
+                navigator.push(
+                  MaterialPageRoute(
+                    builder: (context) => MessagesPage(
+                      userName: receiverDisplayName,
+                      receiverId: receiverId,
+                      chatRoomId: chatRoomId,
+                      senderId: senderId,
+                      reportId: widget.reportId,
+                      receiverReportId: report.reportId ?? "",
+                      fromMatches: true,
                     ),
-                  );
-                }
+                  ),
+                );
               },
             ),
           ],
