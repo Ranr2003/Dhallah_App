@@ -4,6 +4,7 @@
 //  (اولا) استيراد الباكجيز
 // ---------------------------------------------------------
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:firebase_messaging/firebase_messaging.dart'; //جديد
 import 'package:google_sign_in/google_sign_in.dart';
 import 'database_serv.dart';
 import '../models/user_model.dart';
@@ -30,7 +31,25 @@ class AuthenticationService {
       provider: provider ?? "unknown",
     );
 
+    // استدعاء الخدمة المسؤولة عن قاعدة البيانات
     await _dbService.updateOrCreateUser(modelUser);
+
+    // استدعاء حفظ التوكن من خدمة قاعدة البيانات أيضاً
+    await _dbService.saveFcmTokenIfNeeded(user.uid);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // مستمع لتحديث التوكن
+  // ─────────────────────────────────────────────────────────────────────────
+  void setupTokenRefreshListener() {
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        // نحدث التوكن في Firestore عبر الـ DatabaseService
+        await _dbService.updateFcmToken(uid, newToken);
+        print("🔄 تم تحديث FCM Token تلقائياً في القاعدة.");
+      }
+    });
   }
 
   // --- 1. تسجيل الدخول بجوجل (مع الربط التلقائي) ---
@@ -220,9 +239,11 @@ class AuthenticationService {
 
   Future<void> logout() async {
     try {
-      // ✅ الخطوة الأهم: حذف التوكن من السيرفر والجهاز قبل الخروج الفعلي
-      //await _notificationService.deleteDeviceToken();
-
+      final uid = _auth.currentUser?.uid;
+      if (uid != null) {
+        // ✅ الآن نحذف التوكن من Firestore عبر خدمة الداتابيس قبل تسجيل الخروج
+        await _dbService.deleteFcmToken(uid);
+      }
       try {
         await _googleSignIn.signOut();
       } catch (e) {

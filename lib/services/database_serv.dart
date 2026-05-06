@@ -4,6 +4,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
+import 'package:firebase_messaging/firebase_messaging.dart'; // نحتاجها لجلب التوكن
 import '../models/user_model.dart';
 
 
@@ -46,6 +47,53 @@ class DatabaseService {
       }
     } catch (e) {
       throw "خطأ في حفظ بيانات المستخدم في القاعدة: $e";
+    }
+  }
+// ─────────────────────────────────────────────────────────────────────────
+  // [جديد] دوال الـ Token انتقلت هنا للحفاظ على التجريد
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // حفظ التوكن فقط إذا كان غير موجود
+  Future<void> saveFcmTokenIfNeeded(String uid) async {
+    try {
+      final docSnap = await _db.collection('users').doc(uid).get();
+      final data = docSnap.data();
+
+      // إذا التوكن غير موجود، نجلبه ونخزنه
+      if (data == null || !data.containsKey('fcmToken') || data['fcmToken'] == null) {
+        final String? newToken = await FirebaseMessaging.instance.getToken();
+        if (newToken != null) {
+          await updateFcmToken(uid, newToken);
+          print("✅ تم حفظ FCM Token بنجاح.");
+        }
+      } else {
+        print("ℹ️ التوكن موجود مسبقاً.");
+      }
+    } catch (e) {
+      print("❌ خطأ في حفظ Token: $e");
+    }
+  }
+
+  // تحديث التوكن (تُستخدم عند التجديد أو الحفظ الإجباري)
+  Future<void> updateFcmToken(String uid, String token) async {
+    await _db.collection('users').doc(uid).set({
+      'fcmToken': token,
+      'lastTokenUpdate': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  // حذف التوكن (عند تسجيل الخروج)
+  // داخل ملف database_serv.dart
+  Future<void> deleteFcmToken(String uid) async {
+    try {
+      await _db.collection('users').doc(uid).update({
+        'fcmToken': FieldValue.delete(),
+        'lastTokenUpdate': FieldValue.serverTimestamp(), // اختياري لتسجيل وقت الخروج
+      });
+      print("FCM Token deleted from Firestore");
+    } catch (e) {
+      print("Error deleting FCM token: $e");
+      // لا نرفع خطأ هنا (throw) لكي لا يتوقف تسجيل الخروج إذا فشل حذف التوكن
     }
   }
 
