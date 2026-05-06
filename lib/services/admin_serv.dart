@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart'; // اضفته من برانش ليلى
 import '../models/user_model.dart';
-import '../models/report_model.dart';
 import 'package:flutter/foundation.dart';
 
 class AdminService {
@@ -12,10 +11,20 @@ class AdminService {
       var reportsSnapshot = await _firestore.collection('reports').get();
       var allReports = reportsSnapshot.docs;
 
-      // 1. حساب الحالات (بناءً على status عندك)
+      // 1. حساب الحالات بناءً على البيانات الفعلية في الفايرستور عندك
       int total = allReports.length;
-      int completed = allReports.where((doc) => doc['status'] == 'completed').length;
-      int open = allReports.where((doc) => doc['status'] == 'open').length;
+
+      // هنا غيرنا الكلمة من 'completed' إلى 'closed' لأنها هي المستخدمة في الداتابيز عندك
+      int completed = allReports.where((doc) {
+        final data = doc.data();
+        return data.containsKey('status') && data['status'] == 'closed';
+      }).length;
+
+      // البلاغات المفتوحة هي التي لا تساوي 'closed'
+      int open = allReports.where((doc) {
+        final data = doc.data();
+        return data.containsKey('status') && data['status'] != 'closed';
+      }).length;
 
       // 2. حساب المطابقات (البلاغات التي تحتوي على مصفوفة matches غير فارغة)
       int matched = allReports.where((doc) {

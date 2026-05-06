@@ -5,6 +5,7 @@ import '../models/item_model.dart';
 import '../models/report_model.dart';
 import '../services/report_serv.dart';
 import '../widgets/custom_widgets.dart';
+import 'login_page.dart';
 import 'map_picker_page.dart';
 import '../utils/app_theme.dart';
 import '../services/authentication_serv.dart';
@@ -126,6 +127,13 @@ class _LostReportPageState extends State<LostReportPage> {
 
 
   Future<void> _publishReport() async {
+    // 1. أول خطوة: نتحقق هل المستخدم مسجل دخول؟
+    final currentUser = _authService.getCurrentUser();
+    if (currentUser == null) {
+      // إذا كان زائراً، نظهر له رسالة ونوقفه هنا
+      _showGuestWarning(context);      return;
+    }
+    // 2. إذا كان مسجلاً، نكمل التحقق من البيانات (الصور، الحقول، الموقع)
     setState(() => _showImageError = _selectedImage == null);
     bool isFormValid = _formKey.currentState?.validate() ?? false;
     bool hasLocation = _pickedLocation != null;
@@ -197,4 +205,56 @@ class _LostReportPageState extends State<LostReportPage> {
       ),
     ).show();
   }
+
+  void _showGuestWarning(BuildContext context) {
+    AwesomeDialog(
+      context: context,
+      dialogType: DialogType.noHeader, // لإزالة الدائرة البيضاء والأيقونة وجعلها بسيطة
+      animType: AnimType.scale,        // تظهر من المنتصف بشكل أنيق
+      width: MediaQuery.of(context).size.width * 0.8, // عرض متناسق
+      body: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              "تسجيل الدخول مطلوب",
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 15),
+            const Text(
+              "يرجى تسجيل الدخول لتتمكن من\nنشر بلاغك وحفظه",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Tajawal',
+                fontSize: 14,
+                color: Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // زر تسجيل الدخول
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (context) => const LoginPage()));
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text("تسجيل الدخول", style: TextStyle(fontFamily: 'Tajawal', color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).show();
+  }
+
 }

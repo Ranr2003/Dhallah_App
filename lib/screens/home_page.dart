@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/report_serv.dart';
@@ -26,6 +25,7 @@ class HomePage extends StatefulWidget {
 
 
 class _HomePageState extends State<HomePage> {
+  // تعريف مفاتيح وخدمات التطبيق
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final ReportService _reportService = ReportService();
   final AuthenticationService _authService = AuthenticationService();
@@ -38,10 +38,10 @@ class _HomePageState extends State<HomePage> {
 
   @override  void initState() {
     super.initState();
-    _loadUserData();
+    _loadUserData();// تحميل بيانات المستخدم عند فتح التطبيق
   }
 
-
+// دالة جلب بيانات المستخدم وتحديث التوكن للتنبيهات
   Future<void> _loadUserData() async {
     final user = _authService.getCurrentUser();
     if (user != null) {
@@ -59,8 +59,8 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      endDrawer: _buildSideMenu(context),
-      body: WavyBackground(
+      endDrawer: _buildSideMenu(context),// القائمة الجانبية
+      body: WavyBackground(// الخلفية المتموجة الخاصة بالتطبيق
         child: Stack(
           children: [
             SafeArea(
@@ -70,7 +70,7 @@ class _HomePageState extends State<HomePage> {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     const SizedBox(height: 20),
-                    _buildTopBar(),
+                    _buildTopBar(),// شريط التنبيهات والشعار
                     const SizedBox(height: 30),
                     Text("مرحباً $userName،",
                         style: const TextStyle(
@@ -89,11 +89,13 @@ class _HomePageState extends State<HomePage> {
                         )
                     ),
                     const SizedBox(height: 35),
-                    _buildActionHeader(context),
+                    _buildActionHeader(context),// زر بلاغ جديد وعنوان المتابعة
                     const SizedBox(height: 20),
+                    // عرض البلاغات بناءً على حالة تسجيل الدخول
                     Expanded(
-                      child: (currentUid.isEmpty) ? _buildGuestEmptyState()
-                          : StreamBuilder<List<Report>>(
+                      child: (currentUid.isEmpty)
+                          ? _buildGuestEmptyState()// إذا كان زائراً
+                          : StreamBuilder<List<Report>>(// إذا كان مسجلاً (تحديث حي)
                         stream: _reportService.getUserReportsStream(currentUid),
                         builder: (context, snapshot) {
                           if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator(color: AppColors.primary));
@@ -112,24 +114,25 @@ class _HomePageState extends State<HomePage> {
                 ),
               ),
             ),
-            const CustomFloatingNavBar(currentIndex: 1),
+            const CustomFloatingNavBar(currentIndex: 1),// شريط التنقل السفلي
           ],
         ),
       ),
     );
   }
-
-
+  /// بناء شريط التطبيق العلوي (Top Bar)
+  /// يحتوي على: زر التنبيهات مع شارة العدد، شعار التطبيق، وزر القائمة الجانبية
   Widget _buildTopBar() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,// توزيع العناصر (تنبيهات - شعار - منيو)
       children: [
+        // أولاً: زر التنبيهات - يتم التحقق إذا كان المستخدم مسجل دخول أم لا
         currentUid.isNotEmpty ? StreamBuilder<int>(
           stream: _notificationService.getUnreadCount(currentUid),
           builder: (context, snapshot) {
             int unreadCount = snapshot.data ?? 0;
             return Stack(
-              clipBehavior: Clip.none,
+              clipBehavior: Clip.none,// للسماح لدارة التنبيهات بالبروز خارج حدود الأيقونة
               children: [
                 IconButton(
                   icon: const Icon(Icons.notifications_none_rounded,
@@ -141,6 +144,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                 ),
+                // إظهار الدائرة الحمراء (Badge) فقط إذا كان هناك تنبيهات غير مقروءة
                 if (unreadCount > 0)
                   Positioned(
                     right: 6,
@@ -171,16 +175,20 @@ class _HomePageState extends State<HomePage> {
           },
         )
         : IconButton(
+          // إذا كان زائراً: يظهر زر التنبيهات وعند الضغط تظهر رسالة تحذيرية (Guest Warning)
             icon: const Icon(Icons.notifications_none_rounded,
                 size: 30,
                 color: AppColors.primaryDark
             ),
             onPressed: () => _showGuestWarning(context, message: "سجل دخولك لمشاهدة التنبيهات"),
         ),
+        // ثانياً: شعار تطبيق "دلة" في المنتصف
         Image.asset('resourses/DallahAppLogo2.png',
             height: 45,
+            // في حال فشل تحميل الصورة، يتم عرض أيقونة افتراضية لتجنب تعطل الواجهة
             errorBuilder: (context, error, stackTrace) => const Icon(Icons.apps)
         ),
+        // ثالثاً: زر القائمة (Menu) لفتح الـ Drawer الجانبي
         IconButton(icon: const Icon(Icons.menu_rounded,
             size: 30,
             color: AppColors.primaryDark
@@ -191,7 +199,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
+  /// بناء رأس قسم العمليات (Action Header)
+  /// يحتوي على زر إضافة بلاغ جديد وعنوان يوضح حالة التحديث
   Widget _buildActionHeader(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -212,9 +221,12 @@ class _HomePageState extends State<HomePage> {
                       fontFamily: 'Tajawal'
                   )
               ),
-              onPressed: () => currentUid.isEmpty ? _showGuestWarning(context) : _openReportSheet(context),
+            // التحقق من الهوية سينتقل الآن إلى زر "نشر" داخل صفحة البلاغ نفسها
+            onPressed: () => _openReportSheet(context),
+            // ------------------
           ),
         ),
+        // ثانياً: النصوص التوضيحية لعنوان القسم (قائمة البلاغات)
         const Column(crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text("متابعة البلاغات",
@@ -225,6 +237,7 @@ class _HomePageState extends State<HomePage> {
                       fontFamily: 'Tajawal'
                   )
               ),
+              // نص فرعي يطمئن المستخدم بأن البيانات المعروضة محدثة لحظياً
               Text("تحديث مباشر من السيرفر", style: TextStyle(fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Tajawal')),
         ]),
       ],
@@ -232,12 +245,17 @@ class _HomePageState extends State<HomePage> {
   }
 
 
+  /// بناء بطاقة البلاغ التفاعلية مع خاصية السحب للحذف
+  /// [report] الكائن الذي يحتوي على بيانات البلاغ المراد عرضه
   Widget _buildDismissibleReport(Report report) {
     return Dismissible(
       key: Key(report.reportId ?? ''),
       direction: DismissDirection.startToEnd,
+      // نافذة تأكيد تظهر قبل الحذف الفعلي (لضمان عدم الحذف بالخطأ)
       confirmDismiss: (_) => _showDeleteConfirmation(context),
+      // الإجراء الذي يتم بعد الحذف: استدعاء خدمة الحذف لمسح البيانات من الفايربيس والصورة من التخزين
       onDismissed: (_) => _reportService.deleteReport(report.reportId!, report.item.imageURL),
+      // الخلفية التي تظهر تحت البطاقة أثناء عملية السحب (باللون الأحمر وأيقونة الحذف)
       background: Container(
           alignment: Alignment.centerLeft,
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -267,6 +285,7 @@ class _HomePageState extends State<HomePage> {
                 color: AppColors.primary,
                 size: 28
             ),
+            // أيقونة دائرية في الجهة المقابلة توضح نوع البلاغ (مفقود 🔍 أو معثور عليه 👤)
             trailing: CircleAvatar(
                 backgroundColor: AppColors.primary,
                 radius: 18,
@@ -275,6 +294,7 @@ class _HomePageState extends State<HomePage> {
                     size: 20
                 )
             ),
+            // عنوان البلاغ (تصنيف العنصر)
             title: Text(report.item.category,
                 textAlign: TextAlign.right,
                 style: const TextStyle(
@@ -291,7 +311,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
+  /// بناء السطر الفرعي المختصر (Compact Subtitle) لبطاقة البلاغ
+  /// يعرض التاريخ والموقع بشكل أيقونات ونصوص مرتبة
   Widget _buildCompactSubtitle(Report report) {
     String location = report.locationName.split('—').first.trim();
     return Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -324,7 +345,8 @@ class _HomePageState extends State<HomePage> {
     ]);
   }
 
-
+  /// بناء واجهة التفاصيل الموسعة (Expanded Details) للبلاغ
+  /// تعرض الصورة، البيانات التفصيلية (الوقت، الموقع، اللون، الوصف)، وحالة المطابقة الذكية
   Widget _buildExpandedDetails(Report report) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -377,7 +399,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
+  /// بناء ودجت حالة الذكاء الاصطناعي (AI Status Widget)
+  /// هذه الدالة تقرر ماذا يظهر للمستخدم بناءً على حالة المعالجة ووجود مطابقات
   Widget _buildAIStatusWidget(Report report) {
 
     if (report.status == 'closed') {
@@ -431,7 +454,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-
+  /// معالجة النقر على زر المطابقة (Match Button Logic)
+  /// تقوم الدالة بتوجيه المستخدم لصفحة النتائج أو إظهار تنبيهات بناءً على حالة المعالجة
   void _onMatchButtonTapped(Report report) {
     if (report.ai_status == 'completed' ) {
       if (report.matches.isNotEmpty) {
@@ -470,7 +494,8 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-
+  /// بناء واجهة "حالة الزائر الفارغة" (Guest Empty State)
+  /// تظهر في منتصف الشاشة عندما يفتح شخص غير مسجل تطبيق "دلة"
   Widget _buildGuestEmptyState() {
     return Center(
         child: Column(
@@ -508,7 +533,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
+  /// بناء القائمة الجانبية (Drawer / Side Menu)
+  /// تحتوي على معلومات المستخدم، روابط الدعم، وزر تسجيل الخروج
   Widget _buildSideMenu(BuildContext context) {
     bool isGuest = currentUid.isEmpty;
     return Drawer(
@@ -565,7 +591,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
+  /// إظهار رسالة تحذيرية للزوار (SnackBar Custom Warning)
+  /// تظهر عند محاولة الوصول لميزة تتطلب حساباً
   void _showGuestWarning(BuildContext context, {String message = "هذه الميزة متاحة للأعضاء فقط، سجل دخولك الآن!"}) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         backgroundColor: Colors.transparent,
@@ -598,12 +625,9 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
-  Widget _buildMenuTile(IconData icon,
-      String title,
-      VoidCallback onTap,
-      {Color color = AppColors.dustyPurple}
-      ){
+  /// بناء عنصر قائمة مخصص (Menu Tile) لاستخدامه في القائمة الجانبية
+  /// [icon] أيقونة العنصر، [title] النص، [onTap] الوظيفة عند النقر
+  Widget _buildMenuTile(IconData icon,String title, VoidCallback onTap, {Color color = AppColors.dustyPurple}) {
          return ListTile(leading:
          Icon(icon,
              color: color
@@ -614,7 +638,8 @@ class _HomePageState extends State<HomePage> {
                  color: color == AppColors.logouticon || color == AppColors.primary ? color : Colors.black87)), onTap: onTap);
       }
 
-
+  /// فتح نافذة "إضافة بلاغ" (BottomSheet) من الأسفل
+  /// تحتوي على تبويبات (Tabs) للتنقل بين "مفقود" و "معثور عليه"
   void _openReportSheet(BuildContext context) {
     showModalBottomSheet(context: context,
         isScrollControlled: true,
@@ -651,7 +676,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
+  /// إظهار نافذة تأكيد الحذف (Delete Confirmation Dialog)
+  /// تظهر عند محاولة المستخدم سحب البطاقة لحذف بلاغ
   Future<bool?> _showDeleteConfirmation(BuildContext context) {
     return showDialog<bool>(context: context, builder: (context) => AlertDialog(title: const Text("تأكيد الحذف",
         textAlign: TextAlign.right,
@@ -666,7 +692,8 @@ class _HomePageState extends State<HomePage> {
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("إلغاء")), TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("حذف", style: TextStyle(color: Colors.red)))]));
   }
 
-
+  /// بناء واجهة "حالة القائمة الفارغة" (Empty State) للمستخدمين المسجلين
+  /// تظهر عندما لا يكون لدى المستخدم أي بلاغات مسجلة حالياً
   Widget _buildEmptyState() {
     return Center(child:
       Column(

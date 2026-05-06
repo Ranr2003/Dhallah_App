@@ -14,13 +14,14 @@ class AdminDashboard extends StatefulWidget {
 }
 
 class _AdminDashboardState extends State<AdminDashboard> {
+  // تعريف الخدمات (Services) لإدارة البيانات
   final AdminService _adminService = AdminService();
   final ReportService _reportService = ReportService();
 
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 2,// تبويبين: الرئيسية والبلاغات
       child: Scaffold(
         backgroundColor: AppColors.fieldBg,
         appBar: PreferredSize(
@@ -75,19 +76,19 @@ class _AdminDashboardState extends State<AdminDashboard> {
         ),
         body: TabBarView(
           children: [
-            _buildUsersTab(),
-            _buildReportsTab(),
+            _buildUsersTab(),// عرض الإحصائيات وقائمة المستخدمين
+            _buildReportsTab(),// عرض وإدارة البلاغات
           ],
         ),
       ),
     );
   }
-
+// --- [قسم واجهة المستخدمين والإحصائيات] ---
   Widget _buildUsersTab() {
     return CustomScrollView(
       slivers: [
         const SliverToBoxAdapter(child: SizedBox(height: AppDimens.spaceLg)),
-        SliverToBoxAdapter(child: _buildStatsGrid()),
+        SliverToBoxAdapter(child: _buildStatsGrid()),// شبكة الأرقام السريعة
         const SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: AppDimens.paddingH, vertical: 10),
@@ -97,7 +98,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
         ),
-        _buildUsersListStream(onlyBanned: false),
+        _buildUsersListStream(onlyBanned: false),// المستخدمين النشطين
         const SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.symmetric(horizontal: AppDimens.paddingH, vertical: 20),
@@ -107,7 +108,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ),
         ),
-        _buildUsersListStream(onlyBanned: true),
+        _buildUsersListStream(onlyBanned: true),// المستخدمين المحظورين
         const SliverToBoxAdapter(child: SizedBox(height: 50)),
       ],
     );
@@ -116,7 +117,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Widget _buildReportsTab() {
     return _buildReportsManagement();
   }
-
+// --- [بناء شبكة الإحصائيات العلوية] ---
   Widget _buildStatsGrid() {
     return FutureBuilder<Map<String, dynamic>>(
       future: _adminService.getDashboardStats(),
@@ -146,7 +147,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
                 ],
               ),
             ),
-            _buildChartsSection(stats),
+            _buildChartsSection(stats),// عرض الرسوم البيانية
           ],
         );
       },
@@ -178,7 +179,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
     );
   }
-
+// --- [قسم الرسوم البيانية وتحليل النشاط] ---
   Widget _buildChartsSection(Map<String, dynamic> stats) {
     final List<String> yearMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     List<double> rawData = List<double>.from(stats['monthlyStats'] ?? []);
@@ -282,7 +283,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       ),
     );
   }
-
+// --- [عرض قوائم المستخدمين من الفايربيس] ---
   Widget _buildUsersListStream({required bool onlyBanned}) {
     return StreamBuilder<List<Map<String, dynamic>>>(
       stream: _adminService.getUsersWithDataStream(),
@@ -342,12 +343,38 @@ class _AdminDashboardState extends State<AdminDashboard> {
       },
     );
   }
-
+// --- [إدارة البلاغات] ---
   Widget _buildReportsManagement() {
     return StreamBuilder<List<Report>>(
       stream: _reportService.getAllReportsStream(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+// 1. حالة التحميل (بينما يجلب البيانات من الفايربيس)
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        // 2. التحقق من وجود بيانات أو إذا كانت القائمة فارغة
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.assignment_late_outlined, size: 60, color: AppColors.textHint.withOpacity(0.5)),
+                const SizedBox(height: 16),
+                const Text(
+                  "لا يوجد بلاغات حالياً ✨",
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: AppDimens.fontMd,
+                    color: AppColors.textHint,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+        // 3. عرض القائمة في حال وجود بلاغات
         final reports = snapshot.data!;
         return ListView.builder(
           padding: const EdgeInsets.all(16),
@@ -388,7 +415,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
       },
     );
   }
-
+// --- [صناديق الحوار: حظر، حذف، خروج] ---
   void _showBanConfirmation(BuildContext context, String userId, String userName, bool isBanned) {
     showDialog(
       context: context,
@@ -472,12 +499,23 @@ class _AdminDashboardState extends State<AdminDashboard> {
                       children: [
                         Row(
                           children: [
-                            Text(report.item.category, style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: AppDimens.fontAppBar)),
+                            Text(report.item.category,
+                                style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: AppDimens.fontAppBar)),
                             const Spacer(),
-                            _buildBadge(report.type),
+                            _buildBadge(report.type), // مفقود أو معثور
                           ],
                         ),
                         const Divider(height: 25, thickness: 0.5),
+
+                        // --- الخانة الجديدة لحالة البلاغ ---
+                        _detailItem(
+                          "حالة البلاغ:",
+                          report.status == 'closed' ? "مغلق (تم التسليم) ✅" : "مفتوح (قيد الانتظار) 🔍",
+                          // تلوين النص ليكون أوضح
+                          valueColor: report.status == 'closed' ? AppColors.success : Colors.blue,
+                        ),
+
+                        const SizedBox(height: 8),
                         _detailItem("اللون:", report.item.color),
                         _detailItem("الموقع:", report.locationName),
                         _detailItem("الميزات:", report.item.uniqueFeatures),
@@ -540,19 +578,29 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 
-  Widget _detailItem(String label, String value) {
+  Widget _detailItem(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("$label ", style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: AppDimens.fontMd, color: AppColors.primaryDark)),
-          Expanded(child: Text(value, style: const TextStyle(fontFamily: 'Tajawal', fontSize: AppDimens.fontMd))),
+          Text("$label ",
+              style: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.bold, fontSize: AppDimens.fontMd, color: AppColors.primaryDark)),
+          Expanded(
+              child: Text(
+                  value,
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: AppDimens.fontMd,
+                    color: valueColor ?? AppColors.textPrimary, // إذا ما حددنا لون يستخدم اللون الافتراضي
+                    fontWeight: valueColor != null ? FontWeight.bold : FontWeight.normal,
+                  )
+              )
+          ),
         ],
       ),
     );
   }
-
   Widget _buildStatusProgress(String label, int count, int total, Color color) {
     double percentage = total == 0 ? 0 : (count / total);
     return Column(
@@ -599,7 +647,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
     );
   }
 }
-
+// الرسام الخاص برسم منحنى البيانات
 class LineChartPainter extends CustomPainter {
   final List<double> data;
   final Color color;
