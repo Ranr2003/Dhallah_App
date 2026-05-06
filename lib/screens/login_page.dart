@@ -107,8 +107,7 @@ class _LoginPageState extends State<LoginPage> {
   void _redirectUser(fb.User user, String provider, String emailOrPhone) async {
 
     // 🔥🔥🔥 السطر المضاف لحفظ التوكن عند نجاح أي طريقة دخول 🔥🔥🔥
-    await NotificationService().saveDeviceToken();
-
+    await _dbService.saveFcmTokenIfNeeded(user.uid);
     // 1. جلب بيانات المستخدم كاملة من الداتابيز
     var userData = await _dbService.getUserById(user.uid);
 

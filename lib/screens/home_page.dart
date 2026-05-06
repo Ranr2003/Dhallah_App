@@ -39,6 +39,8 @@ class _HomePageState extends State<HomePage> {
   @override  void initState() {
     super.initState();
     _loadUserData();// تحميل بيانات المستخدم عند فتح التطبيق
+    // ✅ أضيفي هذا السطر لضمان تحديث التوكن تلقائياً إذا تغير
+    _authService.setupTokenRefreshListener();
   }
 
 // دالة جلب بيانات المستخدم وتحديث التوكن للتنبيهات
@@ -46,7 +48,7 @@ class _HomePageState extends State<HomePage> {
     final user = _authService.getCurrentUser();
     if (user != null) {
       if (mounted) setState(() => currentUid = user.uid);
-      await _notificationService.saveDeviceToken();
+      await _dbService.saveFcmTokenIfNeeded(user.uid);
       RegularUser? userData = await _dbService.getUserById(user.uid);
       if (userData != null && mounted) {
         setState(() => userName = userData.name);

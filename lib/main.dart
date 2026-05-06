@@ -1,9 +1,10 @@
 import 'package:dhallah_app/screens/chat_list_page.dart';
+import 'package:dhallah_app/services/notification_serv.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'firebase_options.dart';
-import '../services/notification_serv.dart';
+import 'services/authentication_serv.dart'; // ✅ نحتاجه لتفعيل المراقب
 
 // استيراد الشاشات
 import 'screens/start_page.dart';
@@ -22,8 +23,7 @@ void main() async {
   );
 
   // 1. إعداد خدمة الإشعارات
-  NotificationService notificationService = NotificationService();
-
+  final NotificationService notificationService = NotificationService();
   // 2. طلب الإذن (مرة واحدة فقط)
   await notificationService.requestPermissions();
 
@@ -31,8 +31,7 @@ void main() async {
   notificationService.setupForegroundNotifications();
 
   // 4. ✅ إضافة مراقب تحديث التوكن لضمان المزامنة دائماً مع السيرفر
-  notificationService.setupTokenListeners();
-
+  AuthenticationService().setupTokenRefreshListener();
   runApp(const MyApp());
 }
 
