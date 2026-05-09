@@ -1,22 +1,31 @@
-//database_serv.dart // اضفته من برانش ليلى
-//Rand
+//database_serv.dart
 
+// ---------------------------------------------------------
+// (أولا) استيراد المكتبات والباكجيز
+// ---------------------------------------------------------
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart' as fb;
-import 'package:firebase_messaging/firebase_messaging.dart'; // نحتاجها لجلب التوكن
+import 'package:firebase_messaging/firebase_messaging.dart'; // نحتاجهاللالتوكن
+// ---------------------------------------------------------
+// (ثانيا) استيراد الصفحات الأخرى لإستخدامها
+// ---------------------------------------------------------
 import '../models/user_model.dart';
+import '../services/authentication_serv.dart';
 
-
+// ---------------------------------------------------------
+//  (ثالثا) تعريف الكلاس والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  AuthenticationService get _authService => AuthenticationService();
 
-  // هذه الدالة ستكون البديل لـ _saveUserData التي كانت في ملف المصادقة
+// ---------------------------------------------------------
+//  (رابعا)  الدوال
+// ---------------------------------------------------------
   Future<void> updateOrCreateUser(RegularUser user) async {
     try {
       final docRef = _db.collection('users').doc(user.userId);
       final docSnap = await docRef.get();
-
       if (docSnap.exists) {
         // إذا المستخدم موجود، نحدث البيانات مع الحفاظ على الاسم القديم إذا كان موجوداً
         Map<String, dynamic> existingData = docSnap.data() as Map<String, dynamic>;
@@ -25,36 +34,27 @@ class DatabaseService {
         if (existingData['userType'] == 'admin') {
           newData['userType'] = 'admin';
         }
-
-        // 2. حماية حالة الحظر (المحظور يبقى محظوراً ولا يتم تصفير حالته عند الدخول)
+        // حماية حالة الحظر (المحظور يبقى محظوراً ولا يتم تصفير حالته عند الدخول)
         if (existingData['isBanned'] == true) {
           newData['isBanned'] = true;
         }
-
         if (existingData['name'] != null && existingData['name'].toString().isNotEmpty) {
-          newData.remove('name'); // نحذف الاسم من البيانات الجديدة لكي لا يمسح القديم في الـ merge
+          newData.remove('name');
         }
-        // 2. الحماية الجديدة: لا تسمح للدخول الجديد بمسح حالة "اكتمال الملف"
-        // إذا كانت القيمة في قاعدة البيانات true، احذفها من الماب الجديد لكي لا نغيرها لـ false
         if (existingData['isProfileComplete'] == true) {
           newData.remove('isProfileComplete');
         }
-
         await docRef.set(newData, SetOptions(merge: true));
       } else {
-        // إذا مستخدم جديد كلياً
         await docRef.set(user.toMap(), SetOptions(merge: true));
       }
     } catch (e) {
-      throw "خطأ في حفظ بيانات المستخدم في القاعدة: $e";
+      throw "❌ خطأ في حفظ بيانات المستخدم في القاعدة: $e";
     }
   }
-// ─────────────────────────────────────────────────────────────────────────
-  // [جديد] دوال الـ Token انتقلت هنا للحفاظ على التجريد
-  // ─────────────────────────────────────────────────────────────────────────
 
-  // حفظ التوكن فقط إذا كان غير موجود
-  Future<void> saveFcmTokenIfNeeded(String uid) async {
+  /// حفظ التوكن فقط إذا كان غير موجود ///
+  Future<void> getAndSaveFcmToken(String uid) async {
     try {
       final docSnap = await _db.collection('users').doc(uid).get();
       final data = docSnap.data();
@@ -74,7 +74,6 @@ class DatabaseService {
     }
   }
 
-  // تحديث التوكن (تُستخدم عند التجديد أو الحفظ الإجباري)
   Future<void> updateFcmToken(String uid, String token) async {
     await _db.collection('users').doc(uid).set({
       'fcmToken': token,
@@ -82,22 +81,18 @@ class DatabaseService {
     }, SetOptions(merge: true));
   }
 
-  // حذف التوكن (عند تسجيل الخروج)
-  // داخل ملف database_serv.dart
   Future<void> deleteFcmToken(String uid) async {
     try {
       await _db.collection('users').doc(uid).update({
         'fcmToken': FieldValue.delete(),
-        'lastTokenUpdate': FieldValue.serverTimestamp(), // اختياري لتسجيل وقت الخروج
+        'lastTokenUpdate': FieldValue.serverTimestamp(),
       });
-      print("FCM Token deleted from Firestore");
+      print("✅ تم حذف FCM Token بنجاح.");
     } catch (e) {
-      print("Error deleting FCM token: $e");
-      // لا نرفع خطأ هنا (throw) لكي لا يتوقف تسجيل الخروج إذا فشل حذف التوكن
+      print("❌ خطأ في حذف Token: $e");
     }
   }
 
-  /// دالة مهمتها فقط إخبارنا: هل هذا المستخدم أكمل ملفه أم لا؟
   Future<bool> checkProfileCompletion(String uid) async {
     try {
       DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
@@ -105,12 +100,12 @@ class DatabaseService {
         final userData = RegularUser.fromMap(doc.data() as Map<String, dynamic>);
         return userData.isProfileComplete;
       }
-      return false; // إذا لم يجد السجل نعتبره غير مكتمل
+      return false;
     } catch (e) {
-      return false; // في حال حدوث خطأ، نوجهه لإكمال البيانات للأمان
+      return false;
     }
   }
-// 1. خوارزمية الجلب (نفس كودك بالضبط)
+
   Future<void> loadUserData({
     required TextEditingController nameController,
     required TextEditingController phoneController,
@@ -121,7 +116,7 @@ class DatabaseService {
     required Function(VoidCallback) updateState,
   }) async {
     try {
-      fb.User? user = fb.FirebaseAuth.instance.currentUser;
+      final user = _authService.getCurrentUser();
       if (user != null) {
         DocumentSnapshot doc = await _db.collection('users').doc(user.uid).get();
         if (doc.exists && mounted) {
@@ -137,26 +132,25 @@ class DatabaseService {
         }
       }
     } catch (e) {
-      debugPrint("خطأ في جلب البيانات: $e");
+      debugPrint("❌خطأ في جلب البيانات:$e");
     } finally {
       setLoading(false);
     }
   }
 
+  ///الداله اللي بتستخدم في صفحه البروفايل أو معلومات الحساب ///
   Future<void> saveProfile(RegularUser user) async {
     await _db.collection('users').doc(user.userId).set(
-      user.toMap(),
+      user.toMap(updateTime: true),
       SetOptions(merge: true),
     );
   }
 
-  // 2. خوارزمية الفحص (هل القيمة مستخدمة من شخص آخر؟)
   Future<bool> isFieldTaken(String field, String value, String currentUid) async {
     final query = await _db.collection('users').where(field, isEqualTo: value).get();
-    // نرجع true فقط إذا وجدنا شخصاً آخر (UID مختلف) يستخدم نفس القيمة
     return query.docs.any((doc) => doc.id != currentUid);
   }
-  /// الدالة المحدثة: تجلب المستخدم وتحدد نوعه تلقائياً
+
   Future<dynamic> getUserById(String uid) async {
     try {
       DocumentSnapshot doc = await _db.collection('users').doc(uid).get();
@@ -171,11 +165,12 @@ class DatabaseService {
         }
       }
     } catch (e) {
-      debugPrint("خطأ في جلب كائن المستخدم: $e");
+      debugPrint("❌خطأ في جلب كائن المستخدم:$e");
     }
     return null;
   }
-// دالة تعيد Stream لمراقبة بيانات المستخدم لحظياً
+
+ /// لمراقبة بيانات المستخدم لحظياً ///
   Stream<dynamic> getUserStream(String uid) {
     return _db.collection('users').doc(uid).snapshots();
   }

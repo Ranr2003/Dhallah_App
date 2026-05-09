@@ -1,11 +1,11 @@
-// user_model.dart // اضفته من برانش ليلى
-//Rand
+// user_model.dart
+
 // ---------------------------------------------------------
 //  (اولا) استيراد الباكجيز
 // ---------------------------------------------------------
 import 'package:cloud_firestore/cloud_firestore.dart';
 // ---------------------------------------------------------
-//  (ثانيا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+//  (ثانيا) تعريف الكلاس الرئيسي والمتغيرات المطلوبة لبناءالمودل
 // ---------------------------------------------------------
 
 abstract class User {
@@ -25,11 +25,11 @@ abstract class User {
 }
 
 
-// المستخدم العادي يرث من المستخدم وزدنا عليه كذا متغير
+// 1. المستخدم العادي يرث من المستخدم وزدنا عليه كذا متغير
 class RegularUser extends User {
   String userType;
   bool isProfileComplete;
-  bool isBanned; // 1. أضفنا هذا الحقل الجديد هنا
+  bool isBanned;
   String? provider;
 
   RegularUser({
@@ -40,7 +40,7 @@ class RegularUser extends User {
     super.lastUpdate,
     this.userType = 'regular',
     this.isProfileComplete = false,
-    this.isBanned = false, // 2. القيمة الافتراضية "غير محظور"
+    this.isBanned = false,
     this.provider,
   });
 
@@ -52,7 +52,7 @@ class RegularUser extends User {
       email: data['email'] ?? '',
       phone: data['phone'],
       isProfileComplete: data['isProfileComplete'] ?? false,
-      isBanned: data['isBanned'] ?? false, // 3. نجلب حالة الحظر من الداتابيز
+      isBanned: data['isBanned'] ?? false,
       provider: data['provider'],
       lastUpdate: (data['lastUpdate'] as Timestamp?)?.toDate(),
       userType: data['userType'] ?? 'regular',
@@ -60,7 +60,7 @@ class RegularUser extends User {
   }
 
   // لما بنرجع نحفظ البيانات للفاير ستور
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toMap({bool updateTime = false}) {
     return {
       'userId': userId,
       'name': name,
@@ -69,16 +69,16 @@ class RegularUser extends User {
       'isProfileComplete': isProfileComplete,
       'isBanned': isBanned,
       'provider': provider,
-      'lastUpdate': FieldValue.serverTimestamp(),
+      if (updateTime) 'lastUpdate': FieldValue.serverTimestamp(), //فقط في صفحه البروفايل خليته ترو
       'userType': userType,
     };
   }
 }
 
-// 2. كلاس الأدمن
+//  2. كلاس الأدمن يرث من المستخدم
 class Admin extends User {
   String adminLevel;
-  String userType; // أضفنا هذا الحقل لتسهيل الفحص
+  String userType;
 
   Admin({
     required super.userId,
@@ -87,7 +87,7 @@ class Admin extends User {
     super.phone,
     super.lastUpdate,
     required this.adminLevel,
-    this.userType = 'admin', // القيمة الافتراضية دائماً admin
+    this.userType = 'admin',
   });
 
   factory Admin.fromMap(Map<String, dynamic> data) {
@@ -101,7 +101,7 @@ class Admin extends User {
     );
   }
 
-  // أضفت لكِ toMap للأدمن للاحتياط
+
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,

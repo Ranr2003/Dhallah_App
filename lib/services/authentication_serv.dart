@@ -1,26 +1,34 @@
-// authentication_serv.dart  // اضفته من برانش ليلى
-// Rand
+// authentication_serv.dart
+
 // ---------------------------------------------------------
 //  (اولا) استيراد الباكجيز
 // ---------------------------------------------------------
 import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:firebase_messaging/firebase_messaging.dart'; //جديد
 import 'package:google_sign_in/google_sign_in.dart';
+// ---------------------------------------------------------
+// (ثانيا) استيراد الصفحات الأخرى لإستخدامها
+// ---------------------------------------------------------
 import 'database_serv.dart';
 import '../models/user_model.dart';
-import 'notification_serv.dart'; // ✅ استيراد خدمة الإشعارات
 
 // ---------------------------------------------------------
-//  (ثانيا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+//  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
 // ---------------------------------------------------------
 class AuthenticationService {
   final fb.FirebaseAuth _auth = fb.FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
   final DatabaseService _dbService = DatabaseService();
-  final NotificationService _notificationService = NotificationService(); // ✅ تعريف الخدمة
 
-  // --- حفظ/تحديث المستخدم في Firestore ---
-  // نستخدم merge: true لضمان عدم مسح البيانات القديمة
+  String get currentUserId => _auth.currentUser?.uid ?? 'unknown';
+  String? get currentPhone => _auth.currentUser?.phoneNumber;
+  String? get currentEmail => _auth.currentUser?.email;
+
+// ---------------------------------------------------------
+//  (رابعا)  الدوال
+// ---------------------------------------------------------
+  fb.User? getCurrentUser() {return _auth.currentUser;}
+
   Future<void> _saveUserData(fb.User user, {String? providedName, String? provider}) async {
     final modelUser = RegularUser(
       userId: user.uid,
@@ -30,29 +38,21 @@ class AuthenticationService {
       isProfileComplete: false,
       provider: provider ?? "unknown",
     );
-
-    // استدعاء الخدمة المسؤولة عن قاعدة البيانات
     await _dbService.updateOrCreateUser(modelUser);
-
-    // استدعاء حفظ التوكن من خدمة قاعدة البيانات أيضاً
-    await _dbService.saveFcmTokenIfNeeded(user.uid);
+    await _dbService.getAndSaveFcmToken(user.uid);
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // مستمع لتحديث التوكن
-  // ─────────────────────────────────────────────────────────────────────────
   void setupTokenRefreshListener() {
     FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
       final uid = _auth.currentUser?.uid;
       if (uid != null) {
-        // نحدث التوكن في Firestore عبر الـ DatabaseService
         await _dbService.updateFcmToken(uid, newToken);
         print("🔄 تم تحديث FCM Token تلقائياً في القاعدة.");
       }
     });
   }
 
-  // --- 1. تسجيل الدخول بجوجل (مع الربط التلقائي) ---
+  ///1. تسجيل الدخول بجوجل (مع الربط التلقائي)///
   Future<fb.User?> signInWithGoogle() async {
     try {
       final googleUser = await _googleSignIn.signIn();
@@ -86,12 +86,12 @@ class AuthenticationService {
         return result.user;
       }
     } catch (e) {
-      print("خطأ في دخول قوقل: $e");
+      print("❌خطأ في دخول قوقل:$e");
       rethrow;
     }
   }
 
-  // --- 2. تسجيل دخول بالإيميل ---
+  ///2. تسجيل دخول بالإيميل///
   Future<fb.User?> login(String email, String password) async {
     try {
       final result = await _auth.signInWithEmailAndPassword(
@@ -110,8 +110,6 @@ class AuthenticationService {
       await _saveUserData(user!, provider: 'email');
       return user;
     } on fb.FirebaseAuthException catch (e) {
-      // هنا نوحد جميع رسائل خطأ تسجيل الدخول في رسالة واحدة مفهومة
-      // الأكواد الشائعة: user-not-found, wrong-password, invalid-credential
       if (e.code == 'user-not-found' ||
           e.code == 'wrong-password' ||
           e.code == 'invalid-credential' ||
@@ -127,7 +125,7 @@ class AuthenticationService {
     }
   }
 
-  // --- 3. تسجيل مستخدم جديد ---
+  ///3. تسجيل مستخدم جديد///
   Future<fb.User?> register({
     required String username,
     required String email,
@@ -135,10 +133,8 @@ class AuthenticationService {
     required String confirmPassword,
   }) async {
     try {
-      if (password != confirmPassword) throw Exception(
-          "كلمتا المرور غير متطابقتين!");
-      if (!validatePassword(password)) throw Exception(
-          "كلمة المرور يجب أن تكون 6 خانات على الأقل");
+      if (password != confirmPassword) throw Exception("كلمتا المرور غير متطابقتين!");
+      if (!validatePassword(password)) throw Exception("كلمة المرور يجب أن تكون 6 خانات على الأقل");
 
       final result = await _auth.createUserWithEmailAndPassword(
           email: email, password: password);
@@ -151,7 +147,6 @@ class AuthenticationService {
       }
       return user;
     } on fb.FirebaseAuthException catch (e) {
-      // هنا نحول أكواد الفايربيس إلى رسائل عربية
       switch (e.code) {
         case 'email-already-in-use':
           throw "هذا البريد الإلكتروني مسجل مسبقاً، جرب تسجيل الدخول.";
@@ -169,17 +164,15 @@ class AuthenticationService {
     }
   }
 
-  // --- 4. إرسال كود التحقق (للدخول أو للربط من البروفايل) ---
+  ///4. إرسال كود التحقق (للدخول أو للربط من البروفايل)///
   Future<void> verifyPhoneNumber({
     required String phoneNumber,
     required Function(String verificationId) onCodeSent,
     required Function(String error) onError,
   }) async {
     try {
-      await _auth.verifyPhoneNumber(
-        phoneNumber: phoneNumber,
+      await _auth.verifyPhoneNumber(phoneNumber: phoneNumber,
         verificationCompleted: (fb.PhoneAuthCredential credential) async {
-          // التحقق التلقائي (في بعض أجهزة أندرويد)
           fb.User? user = _auth.currentUser;
           if (user != null) {
             await user.linkWithCredential(credential);
@@ -195,14 +188,13 @@ class AuthenticationService {
     }
   }
 
-  // --- 5. دالة الربط النهائية (تستخدم في البروفايل) ---
+  ///5. دالة الربط النهائية (تستخدم في البروفايل)///
   Future<void> linkPhoneNumber(String verificationId, String smsCode) async {
     try {
       final credential = fb.PhoneAuthProvider.credential(
         verificationId: verificationId,
         smsCode: smsCode,
       );
-
       fb.User? user = _auth.currentUser;
       if (user != null) {
         // نربط الرقم بالحساب الحالي (الإيميل) لتوحيد الـ UID
@@ -217,7 +209,7 @@ class AuthenticationService {
     }
   }
 
-  // --- 6. تسجيل الدخول العادي بالـ OTP (في حال لم يكن هناك حساب حالي) ---
+  ///6. تسجيل الدخول العادي بالـ OTP (في حال لم يكن هناك حساب حالي)///
   Future<fb.User?> signInWithOTP(String verificationId, String smsCode) async {
     try {
       final credential = fb.PhoneAuthProvider.credential(
@@ -232,35 +224,49 @@ class AuthenticationService {
     }
   }
 
-  // --- وظائف مساعدة ---
-  String get currentUserId => _auth.currentUser?.uid ?? 'unknown';
+  /// 7. إرسال رابط استعادة كلمة المرور ///
+  Future<void> sendPasswordResetEmail(String email) async {
+    try {
 
-  bool validatePassword(String password) => password.length >= 6;
+      await _auth.sendPasswordResetEmail(email: email);
+    } on fb.FirebaseAuthException catch (e) {
+      switch (e.code) {
+        case 'user-not-found':
+          throw "هذا البريد غير مسجل لدينا.";
+        case 'invalid-email':
+          throw "صيغة البريد الإلكتروني غير صحيحة.";
+        case 'too-many-requests':
+          throw "تم إرسال طلبات كثيرة، يرجى المحاولة لاحقاً.";
+        default:
+          throw "حدث خطأ في النظام: ${e.message}";
+      }
+    } catch (e) {
+      throw "حدث خطأ غير متوقع أثناء إرسال الرابط.";
+    }
+  }
 
   Future<void> logout() async {
     try {
       final uid = _auth.currentUser?.uid;
       if (uid != null) {
-        // ✅ الآن نحذف التوكن من Firestore عبر خدمة الداتابيس قبل تسجيل الخروج
         await _dbService.deleteFcmToken(uid);
       }
       try {
         await _googleSignIn.signOut();
       } catch (e) {
-        print("Google SignOut Error: $e");
+        print("❌خطأ في تسجيل الخروج من قوقل$e");
       }
 
       await _auth.signOut();
-      print("User logged out successfully");
+      print("تم تسجيل الخروج بنجاح✅");
     } catch (e) {
-      print("Logout Error: $e");
+      print("❌خطأ في تسجيل الخروج$e");
       await _auth.signOut();
     }
   }
-  fb.User? getCurrentUser() {
-    return _auth.currentUser;
-  }
-  // 1. دالة لتغيير كلمة المرور (بدلاً من استدعائها مباشرة في الصفحة)
+
+  bool validatePassword(String password) => password.length >= 6;
+
   Future<void> updatePassword(String newPassword) async {
     try {
       fb.User? user = _auth.currentUser;
@@ -268,13 +274,7 @@ class AuthenticationService {
         await user.updatePassword(newPassword);
       }
     } catch (e) {
-      rethrow; // نترك التعامل مع الخطأ للصفحة لتعرض التنبيه المناسب
+      rethrow;
     }
   }
-
-  // 2. دالة لجلب رقم الجوال الحالي المخزن في فايربيس (للمقارنة)
-  String? get currentPhone => _auth.currentUser?.phoneNumber;
-
-  // 3. دالة لجلب البريد الإلكتروني الحالي
-  String? get currentEmail => _auth.currentUser?.email;
 }

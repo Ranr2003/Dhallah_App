@@ -1,7 +1,7 @@
-// login_page.dart  // اضفته من برانش ليلى
-// Rand
+// login_page.dart
+
 // ---------------------------------------------------------
-// (أولا) استيراد المكتبوات والباكجيز
+// (أولا) استيراد  والباكجيز
 // ---------------------------------------------------------
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -18,15 +18,15 @@ import '../services/database_serv.dart';
 import '../widgets/custom_widgets.dart';
 import '../widgets/Wavy_Background.dart';
 import '../screens/signup_page.dart';
-import '../screens/ForgotPassword_page.dart';
+import '../screens/forgot_password_screen.dart';
 import '../screens/account_info_page.dart';
+import '../utils/app_theme.dart'; // الثيم الموحد
 import '../screens/home_page.dart';
 import '../models/user_model.dart';
 import 'admin_dashboard.dart';
-import '../services/notification_serv.dart'; // تأكدي من المسار الصحيح للملف الذي أنشأتيه
 
 // ---------------------------------------------------------
-//  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+//  (ثالثا) تعريف الكلاس والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
 // ---------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -54,9 +54,9 @@ class _LoginPageState extends State<LoginPage> {
   bool _isTimerActive = false;
 
 // ---------------------------------------------------------
-//  (رابعا) بعض الدوال المهمه مثل تنظيف و الؤقت و ارسال رابط الاستعاده والكود والانتقال  ورسائل  الخطأ
+//  (رابعا)  الدوال المهمه
 // ---------------------------------------------------------
-  // تنظف
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -64,6 +64,7 @@ class _LoginPageState extends State<LoginPage> {
     _timer?.cancel();
     super.dispose();
   }
+
   void _showBannedDialog(BuildContext context) {
     showDialog(
       context: context,
@@ -101,27 +102,18 @@ class _LoginPageState extends State<LoginPage> {
     await prefs.setString('loginMethod', method);
   }
 
-// ---------------------------------------------------------
-// تعديل دالة توجيه المستخدم لتشمل فحص الأدمن
-// ---------------------------------------------------------
   void _redirectUser(fb.User user, String provider, String emailOrPhone) async {
 
-    // 🔥🔥🔥 السطر المضاف لحفظ التوكن عند نجاح أي طريقة دخول 🔥🔥🔥
-    await _dbService.saveFcmTokenIfNeeded(user.uid);
-    // 1. جلب بيانات المستخدم كاملة من الداتابيز
+    await _dbService.getAndSaveFcmToken(user.uid);
+
     var userData = await _dbService.getUserById(user.uid);
-
     if (mounted && userData != null) {
-
-      // 🔥 فحص الحظر (باستخدام logout الموجودة في سيرفس رند)
-      // نتحقق من الحقل isBanned الموجود في مودل RegularUser
       if (userData is RegularUser && userData.isBanned) {
-        await _authService.logout(); // ✅ هنا التعديل من signOut إلى logout
-        _showBannedDialog(context);   // إظهار نافذة الحظر
+        await _authService.logout();
+        _showBannedDialog(context);
         return;
       }
-
-      // 2. التحقق من الأدمن
+      // التحقق من الأدمن
       if (userData.userType == 'admin') {
         Admin adminUser = Admin(
           userId: userData.userId,
@@ -138,7 +130,7 @@ class _LoginPageState extends State<LoginPage> {
         return;
       }
 
-      // 3. التحقق من اكتمال البروفايل للمستخدم العادي
+      //  التحقق من اكتمال البروفايل للمستخدم العادي
       bool isComplete = await _dbService.checkProfileCompletion(user.uid);
       if (isComplete) {
         Navigator.pushAndRemoveUntil(
@@ -177,10 +169,31 @@ class _LoginPageState extends State<LoginPage> {
       });
     });
   }
+
+  void _handleLogin() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")));
+      return;
+    }
+    setState(() => _isLoading = true);
+    try {
+      final user = await _authService.login(_emailController.text.trim(), _passwordController.text.trim());
+      if (user != null) {
+        await _saveLoginMethod("email");
+        _redirectUser(user, "email", _emailController.text.trim());
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: Colors.redAccent));
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
 // ---------------------------------------------------------
 //  (خامسا) التصميم والبناء
 // ---------------------------------------------------------
-
 // شيت لما يدخل برقم الجوال اللي تطلع من تحت
   void _showPhoneLoginSheet() {
     isCodeSent = false;
@@ -201,7 +214,7 @@ class _LoginPageState extends State<LoginPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 25, vertical: 30),
               decoration: const BoxDecoration(
-                color: Colors.white,
+                color: AppColors.white,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(35)),
               ),
               child: Column(
@@ -211,7 +224,7 @@ class _LoginPageState extends State<LoginPage> {
                   const SizedBox(height: 20),
 
                   if (!isCodeSent) ...[
-                    const Text("تسجيل الدخول بالجوال", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                    const Text("تسجيل الدخول بالجوال", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkgray)),
                     const SizedBox(height: 10),
                     const Text("أدخل رقم جوالك لتصلك رسالة التأكيد", style: TextStyle(fontSize: 13, color: Colors.grey)),
                     const SizedBox(height: 30),
@@ -220,7 +233,7 @@ class _LoginPageState extends State<LoginPage> {
                       decoration: InputDecoration(
                         labelText: 'رقم الجوال',
                         hintText: '5xxxxxxx',
-                        fillColor: const Color(0xFFFBF9FF),
+                        fillColor: AppColors.white,
                         filled: true,
                         errorText: _phoneError,
                         errorStyle: const TextStyle(fontSize: 10, height: 0.8),
@@ -234,13 +247,22 @@ class _LoginPageState extends State<LoginPage> {
                       },
                     ),
                   ] else ...[
-                    const Text("رمز التحقق", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                    const Text("رمز التحقق", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.darkgray)),
                     const SizedBox(height: 10),
                     Text("أدخل الرمز المرسل إلى $_fullPhoneNumber", style: const TextStyle(fontSize: 13, color: Colors.grey), textAlign: TextAlign.center),
                     const SizedBox(height: 30),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: List.generate(6, (index) => _buildOTPBox(context, index, setSheetState)),
+                      children: List.generate(6, (index) {
+                        return CustomOTPField(
+                          index: index,
+                          otpCode: _otpCode,
+                          isError: _isOtpError,
+                          onChanged: () {
+                            setSheetState(() {_isOtpError = false;});
+                          },
+                        );
+                      }),
                     ),
                     if (_isOtpError) ...[
                       const SizedBox(height: 12),
@@ -326,52 +348,6 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildOTPBox(BuildContext context, int index, StateSetter setSheetState) {
-    return SizedBox(
-      width: 45,
-      child: TextField(
-        autofocus: index == 0,
-        textAlign: TextAlign.center,
-        keyboardType: TextInputType.number,
-        maxLength: 1,
-        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF673AB7)),
-        decoration: InputDecoration(
-          counterText: "",
-          fillColor: const Color(0xFFFBF9FF),
-          filled: true,
-          // لو خطأ يحط الحدود بالاحمر
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: _isOtpError ? Colors.redAccent : const Color(0xFFEEEEEE))),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: const Color(0xFF673AB7), width: 2)),
-        ),
-        onChanged: (value) {
-          setSheetState(() { _otpCode[index] = value; _isOtpError = false; });
-          if (value.length == 1 && index < 5) FocusScope.of(context).nextFocus();
-          if (value.isEmpty && index > 0) FocusScope.of(context).previousFocus();
-        },
-      ),
-    );
-  }
-
-  void _handleLogin() async {
-    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")));
-      return;
-    }
-    setState(() => _isLoading = true);
-    try {
-      final user = await _authService.login(_emailController.text.trim(), _passwordController.text.trim());
-      if (user != null) {
-        await _saveLoginMethod("email");
-        _redirectUser(user, "email", _emailController.text.trim());
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString().replaceAll("Exception:", "")), backgroundColor: Colors.redAccent));
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
 // الرساله لما نضغط زر ابل ومايكروسوفت
   void _showComingSoonDialog(BuildContext context, String provider) {
     showDialog(
@@ -382,7 +358,7 @@ class _LoginPageState extends State<LoginPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.auto_awesome_rounded, color: Color(0xFFB293CD), size: 60),
+            const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 60),
             const SizedBox(height: 20),
             const Text("! قريبًا", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
             const SizedBox(height: 15),
@@ -394,6 +370,7 @@ class _LoginPageState extends State<LoginPage> {
       ),
     );
   }
+
 // الشكل للصفحه
   @override
   Widget build(BuildContext context) {
@@ -406,29 +383,29 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(35),
-              boxShadow: [BoxShadow(color: const Color(0xFFD2B4EC).withOpacity(0.15), blurRadius: 30, offset: const Offset(0, 10))],
+              boxShadow: [BoxShadow(color:AppColors.purble.withOpacity(0.15), blurRadius: 30, offset: const Offset(0, 10))],
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset('resourses/DallahAppLogo2.png', height: 80),
                 const SizedBox(height: 15),
-                const Text("تسجيل الدخول", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF444444))),
+                const Text("تسجيل الدخول", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.darkgray)),
                 const Text("! هلابك من جديد ", style: TextStyle(fontSize: 14, color: Colors.grey)),
                 const SizedBox(height: 30),
 
-                CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك الإلكتروني", controller: _emailController, fillColor: const Color(0xFFFBF9FF)),
+                CustomInputField(label: "البريد الإلكتروني", hintText: "أدخل بريدك الإلكتروني", controller: _emailController, fillColor: AppColors.fieldBg),
                 const SizedBox(height: 18),
-                CustomInputField(label: "كلمة السر", hintText: "أدخل كلمة السر", controller: _passwordController, isPass: true, fillColor: const Color(0xFFFBF9FF)),
+                CustomInputField(label: "كلمة السر", hintText: "أدخل كلمة السر", controller: _passwordController, isPass: true, fillColor: AppColors.fieldBg),
 
                 const SizedBox(height: 30),
                 WaterRippleButton(text: "دخول", onTap: _handleLogin, isLoading: _isLoading, width: double.infinity, height: 55),
 
                 const SizedBox(height: 25),
                 const Row(children: [
-                  Expanded(child: Divider(thickness: 1, color: Color(0xFFEEEEEE))),
+                  Expanded(child: Divider(thickness: 1, color: AppColors.background)),
                   Padding(padding: EdgeInsets.symmetric(horizontal: 10), child: Text("أو سجل الدخول عبر", style: TextStyle(color: Colors.grey, fontSize: 12))),
-                  Expanded(child: Divider(thickness: 1, color: Color(0xFFEEEEEE))),
+                  Expanded(child: Divider(thickness: 1, color: AppColors.background)),
                 ]),
 
                 const SizedBox(height: 20),
@@ -449,7 +426,6 @@ class _LoginPageState extends State<LoginPage> {
                       } catch (e) {
                         setState(() => _isLoading = false);
                         if (mounted) {
-                          // هنا نتأكد أن رسالة الحظر هي التي تظهر أولاً
                           String errorMessage = e.toString().replaceAll("Exception:", "").trim();
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(content: Text(errorMessage), backgroundColor: Colors.redAccent),
@@ -478,6 +454,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
+// شكل ازرار طرق الدخول
   Widget _buildSocialIcon(dynamic icon, Color color, String label, VoidCallback onTap) {
     return Column(
       children: [
@@ -485,7 +462,7 @@ class _LoginPageState extends State<LoginPage> {
           onTap: onTap,
           child: Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: const Color(0xFFF0F0F0)), color: Colors.white),
+            decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white), color: Colors.white),
             child: icon is IconData ? Icon(icon, color: color, size: 22) : FaIcon(icon, color: color, size: 22),
           ),
         ),

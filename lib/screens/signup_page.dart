@@ -1,10 +1,8 @@
 // signup_page.dart
-// Rand
 
 // ---------------------------------------------------------
-// (أولا) استيراد المكتبات والباكجيز
+// (أولا) استيراد والباكجيز
 // ---------------------------------------------------------
-import 'package:dhallah_app/utils/app_theme.dart';
 import 'package:flutter/material.dart';
 // ---------------------------------------------------------
 // (ثانيا) استيراد الصفحات الأخرى لإستخدامها
@@ -12,10 +10,8 @@ import 'package:flutter/material.dart';
 import '../services/authentication_serv.dart';
 import '../screens/login_page.dart';
 import '../widgets/Wavy_Background.dart';
-//import '../widgets/custom_button1.dart';
-//import '../Widgets/custom_text_field.dart';
-//import '../widgets/custom_text_link.dart';
 import '../widgets/custom_widgets.dart';
+import '../utils/app_theme.dart';
 
 // ---------------------------------------------------------
 //  (ثالثا) تعريف الويدجت الرئيسية والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
@@ -38,7 +34,7 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _isLoading = false;
 
 // ---------------------------------------------------------
-//  (رابعا) بعض الدوال المهمه مثل تنظيف و
+//   (رابعا) بعض الدوال المهمه مثل تنظيف و التسجيل
 // ---------------------------------------------------------
   @override
   void dispose() {
@@ -50,19 +46,13 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   void _handleSignUp() async {
-    // التحقق من الحقول
-    if (_emailController.text.isEmpty ||
-        _passwordController.text.isEmpty ||
-        _usernameController.text.isEmpty ||
-        _confirmPasswordController.text.isEmpty) {
+    if (_emailController.text.isEmpty ||_passwordController.text.isEmpty || _usernameController.text.isEmpty || _confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")),
       );
       return;
     }
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() {_isLoading = true;});
     try {
       final user = await _authService.register(
         username: _usernameController.text.trim(),
@@ -109,28 +99,20 @@ class _SignUpPageState extends State<SignUpPage> {
 // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
-    return WavyBackground( // الاسم الجديد والجميل
+    return WavyBackground(
       child: Center(
         child: SingleChildScrollView(
           child: Container(
-            // استجابة الشاشة (Responsive width)
             width: MediaQuery
-                .of(context)
-                .size
-                .width > 600 ? 400 : MediaQuery
-                .of(context)
-                .size
-                .width * 0.85,
-            padding: const EdgeInsets.symmetric(
-                horizontal: AppDimens.paddingH, vertical: 30),
+                .of(context).size.width > 600 ? 400 : MediaQuery
+                .of(context).size.width * 0.85,
+            padding: const EdgeInsets.symmetric(horizontal: AppDimens.paddingH, vertical: 30),
             decoration: BoxDecoration(
               color: AppColors.white,
-              // توحيد اللون
               borderRadius: BorderRadius.circular(AppDimens.radiusSheet),
-              // توحيد الانحناء
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.shadowColor.withOpacity(0.15), // توحيد الظل
+                  color: AppColors.shadowColor.withOpacity(0.15),
                   blurRadius: 30,
                   offset: const Offset(0, 10),
                 ),
@@ -139,13 +121,9 @@ class _SignUpPageState extends State<SignUpPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // الشعار
-                Image.asset('resourses/DallahAppLogo2.png', height: 70,
-                    fit: BoxFit.contain),
+                Image.asset('resourses/DallahAppLogo2.png', height: 70, fit: BoxFit.contain),
                 const SizedBox(height: AppDimens.spaceSm),
-
-                const Text(
-                  "تسجيل الحساب",
+                const Text("تسجيل الحساب",
                   style: TextStyle(
                       fontSize: AppDimens.fontAppBar,
                       fontWeight: FontWeight.bold,
@@ -153,8 +131,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       fontFamily: 'Tajawal'
                   ),
                 ),
-                const Text(
-                  "سجل معلوماتك ونكمل مشوارنا",
+                const Text("سجل معلوماتك ونكمل مشوارنا",
                   style: TextStyle(
                       fontSize: AppDimens.fontMd,
                       color: AppColors.textSecondary,
@@ -163,16 +140,13 @@ class _SignUpPageState extends State<SignUpPage> {
                   ),
                 ),
                 const SizedBox(height: AppDimens.spaceLg),
-
-                // الحقول النصية باستخدام ألوان الثيم
                 CustomInputField(
                   label: "الاسم الكامل",
                   hintText: "أدخل اسمك الثلاثي",
                   controller: _usernameController,
-                  fillColor: AppColors.fieldBg, // توحيد خلفية الحقل
+                  fillColor: AppColors.fieldBg,
                 ),
                 const SizedBox(height: AppDimens.spaceMd),
-
                 CustomInputField(
                   label: "البريد الإلكتروني",
                   hintText: "example@mail.com",
@@ -181,7 +155,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   fillColor: AppColors.fieldBg,
                 ),
                 const SizedBox(height: AppDimens.spaceMd),
-
                 CustomInputField(
                   label: "كلمة السر",
                   hintText: "أدخل كلمة السر",
@@ -190,7 +163,6 @@ class _SignUpPageState extends State<SignUpPage> {
                   fillColor: AppColors.fieldBg,
                 ),
                 const SizedBox(height: AppDimens.spaceMd),
-
                 CustomInputField(
                   label: "تأكيد كلمة السر",
                   hintText: "أعد كتابة كلمة السر",
@@ -198,19 +170,14 @@ class _SignUpPageState extends State<SignUpPage> {
                   isPass: true,
                   fillColor: AppColors.fieldBg,
                 ),
-
                 const SizedBox(height: AppDimens.spaceLg),
 
-                // الزر الأساسي
                 WaterRippleButton(
                   text: "قم بالتسجيل",
                   onTap: _handleSignUp,
                   isLoading: _isLoading,
                 ),
-
                 const SizedBox(height: 20),
-
-                // رابط العودة لتسجيل الدخول
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -218,8 +185,7 @@ class _SignUpPageState extends State<SignUpPage> {
                       text: "  قم بتسجيل الدخول  ",
                       onTap: () => Navigator.pop(context),
                     ),
-                    const Text(
-                        "لديك حساب بالفعل؟ ",
+                    const Text("لديك حساب بالفعل؟ ",
                         style: TextStyle(color: AppColors.textSecondary,
                             fontSize: AppDimens.fontMd)
                     ),

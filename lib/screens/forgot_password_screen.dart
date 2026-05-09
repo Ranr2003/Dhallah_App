@@ -1,21 +1,25 @@
-//ForgotPassword_page.dart
-//Rand - Updated with Custom Widgets
+//forgot_password_screen.dart
 
+// ---------------------------------------------------------
+// (أولا) استيراد الباكجيز
+// ---------------------------------------------------------
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:firebase_auth/firebase_auth.dart';
 
 // ---------------------------------------------------------
-// (ثانيا) استيراد الملفات الضرورية
+// (ثانيا) استيراد الملفات
 // ---------------------------------------------------------
 import '../screens/account_info_page.dart';
 import '../services/authentication_serv.dart';
 import '../services/database_serv.dart';
 import '../widgets/Wavy_Background.dart';
 import '../widgets/custom_widgets.dart';
-import '../utils/app_theme.dart'; // تأكدي من استيراد ملف الثيم
+import '../utils/app_theme.dart';
 
+// ---------------------------------------------------------
+//  (ثالثا) تعريف الكلاس والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
@@ -31,7 +35,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final DatabaseService _dbService = DatabaseService();
   String _verificationId = "";
 
-  String _fullPhoneNumber = ""; // نستخدم الرقم الكامل الآن
+  String _fullPhoneNumber = "";
   String? _phoneError;
   bool _isOtpSent = false;
   bool _isOtpError = false;
@@ -41,7 +45,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _isTimerActive = false;
 
 // ---------------------------------------------------------
-//  (رابعا) بعض الدوال المهمه مثل تنظيف و الؤقت و ارسال رابط الاستعاده والكود والانتقال  ورسائل  الخطأ
+//  (رابعا)  الدوال المهمه
 // ---------------------------------------------------------
   Future<void> _sendResetLink() async {
     final email = _emailController.text.trim();
@@ -49,24 +53,18 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       _showError("يرجى إدخال البريد الإلكتروني");
       return;
     }
+
     setState(() => _isLoading = true);
+
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await _authService.sendPasswordResetEmail(email);
+
       setState(() => _isLoading = false);
-      _showSuccessDialog(
-          "تم إرسال رابط استعادة كلمة المرور لبريدك. يرجى تفقد البريد الوارد (والرسائل غير المرغوب فيها).");
-    } on FirebaseAuthException catch (e) {
+      _showSuccessDialog("تم إرسال رابط استعادة كلمة المرور لبريدك. يرجى تفقد البريد الوارد (والرسائل غير المرغوب فيها).");
+
+    }catch (errorMessage) {
       setState(() => _isLoading = false);
-      if (e.code == 'user-not-found') {
-        _showError("هذا البريد غير مسجل لدينا.");
-      } else if (e.code == 'invalid-email') {
-        _showError("صيغة البريد الإلكتروني غير صحيحة.");
-      } else {
-        _showError("حدث خطأ أثناء الإرسال: ${e.message}");
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showError("حدث خطأ غير متوقع: $e");
+      _showError(errorMessage.toString());
     }
   }
 
@@ -101,15 +99,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     });
   }
 
-  // تحديث دالة إرسال الكود لتستخدم الرقم الكامل
   void _handlePhoneReset() async {
     if (_fullPhoneNumber.isEmpty || !_fullPhoneNumber.startsWith('+9665')) {
       setState(() => _phoneError = "الرجاء التأكد من صحة رقم الجوال");
       return;
     }
     setState(() => _isLoading = true);
-    bool isRegistered = await _dbService.isFieldTaken(
-        'phone', _fullPhoneNumber, "no-uid");
+    bool isRegistered = await _dbService.isFieldTaken('phone', _fullPhoneNumber, "no-uid");
 
     if (!isRegistered) {
       setState(() {
@@ -148,12 +144,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     try {
       final user = await _authService.signInWithOTP(_verificationId, fullCode);
       if (user != null && mounted) {
-        final prefs = await SharedPreferences
-            .getInstance(); // حفظنا طريقه الدخول
+        final prefs = await SharedPreferences.getInstance(); // حفظنا طريقه الدخول
         await prefs.setString('loginMethod', 'phone');
         // الانتقال للملف الشخصي
-        Navigator.pushReplacement(
-          context,
+        Navigator.pushReplacement(context,
           MaterialPageRoute(
             builder: (context) =>
                 ProfilePage(
@@ -193,7 +187,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
 // ---------------------------------------------------------
-//  (خامسا) البناء للصفحه و استقبال الكود
+//  (خامسا) البناء للصفحه
 // ---------------------------------------------------------
   @override
   Widget build(BuildContext context) {
@@ -214,16 +208,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     const SizedBox(height: 40),
                     const Icon(Icons.lock_reset, size: AppDimens.iconSizeXl,
                         color: AppColors.primary),
-                    const Text(
-                        "استعادة كلمة المرور",
+                    const Text("استعادة كلمة المرور",
                         style: TextStyle(fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: AppColors.primary,
                             fontFamily: 'Tajawal')
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      "اختر الطريقة المناسبة لاستعادة حسابك",
+                    const Text("اختر الطريقة المناسبة لاستعادة حسابك",
                       style: TextStyle(
                           fontSize: AppDimens.fontMd,
                           color: AppColors.textSecondary,
@@ -247,11 +239,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                         label: "البريد الإلكتروني",
                         hintText: "أدخل بريدك المسجل",
                         controller: _emailController,
-                        fillColor: AppColors.fieldBg, // توحيد اللون
+                        fillColor: AppColors.fieldBg,
                       )
                     ] else
                       if (!_isOtpSent) ...[
-                        // استخدام الويدجت الموحدة لرقم الجوال
                         CustomPhoneField(
                           errorText: _phoneError,
                           onChanged: (fullNumber) {
@@ -271,7 +262,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           )
                           ),
                           const SizedBox(height: 20),
-                          // استخدام الويدجت الموحدة للـ OTP
                           Row(
                               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                               children: List.generate(6, (index) =>
@@ -325,7 +315,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     );
   }
 
-
   Widget _buildTabButton(String title, bool isSelected, VoidCallback onTap) {
     return Expanded(
       child: InkWell(
@@ -333,8 +322,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : AppColors.secondary
-                .withOpacity(0.5),
+            color: isSelected ? AppColors.primary : AppColors.secondary.withOpacity(0.5),
             borderRadius: BorderRadius.circular(AppDimens.radiusSmall),
           ),
           child: Text(title, textAlign: TextAlign.center, style: TextStyle(

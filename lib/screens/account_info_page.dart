@@ -1,20 +1,25 @@
-// account_info_page.dart  // اضفته من برانش ليلى
-// Updated by Gemini for Rand - Dhallah Project
+// account_info_page.dart
 
+// ---------------------------------------------------------
+// (أولا) استيراد الباكجيز
+// ---------------------------------------------------------
 import 'package:flutter/material.dart';
 
 // ---------------------------------------------------------
-// (ثانيا) استيراد الملفات الضرورية
+// (ثانيا) استيراد الملفات
 // ---------------------------------------------------------
 import '../models/user_model.dart';
 import '../widgets/Wavy_Background.dart';
-import '../widgets/custom_widgets.dart'; // الويدجتس الموحدة
+import '../widgets/custom_widgets.dart';
 import '../services/authentication_serv.dart';
 import '../services/database_serv.dart';
-import '../utils/app_theme.dart'; // الثيم الموحد
+import '../utils/app_theme.dart';
 import 'login_page.dart';
 import 'home_page.dart';
 
+// ---------------------------------------------------------
+//  (ثالثا) تعريف الكلاس والمتغيرات المطلوبة لبناء الصفحة والقيم المبدأية
+// ---------------------------------------------------------
 class ProfilePage extends StatefulWidget {
   final String userEmail;
   final String? initialPhoneNumber;
@@ -49,6 +54,9 @@ class _ProfilePageState extends State<ProfilePage> {
   String _verificationId = "";
   List<String> _otpCode = ["", "", "", "", "", ""];
 
+// ---------------------------------------------------------
+//  (رابعا) بعض الدوال المهمه
+// ---------------------------------------------------------
   @override
   void initState() {
     super.initState();
@@ -74,10 +82,18 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _phoneController.dispose();
+    _nameController.dispose();
+    _passController.dispose();
+    super.dispose();
+  }
+
   Future<void> _finalSave() async {
     setState(() => _isSaving = true);
     try {
-      // التعديل 1: بدلاً من استدعاء Firebase مباشرة، نستخدم الدالة الجاهزة عندك في السيرفس
       final String currentUid = _authService.currentUserId;
       if (currentUid == 'unknown') return;
 
@@ -86,11 +102,9 @@ class _ProfilePageState extends State<ProfilePage> {
           _showError("كلمة المرور يجب أن تكون 6 خانات على الأقل");
           return;
         }
-        // التعديل 2: نستخدم الدالة التي أضفناها للسيرفس لتغيير الباسوورد
         await _authService.updatePassword(_passController.text.trim());
       }
 
-      // المنطق كما هو دون تغيير
       final updatedUser = RegularUser(
         userId: currentUid,
         name: _nameController.text.trim(),
@@ -120,7 +134,6 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     } catch (e) {
-      // هنا اختصرنا التعامل مع الخطأ لأن السيرفس سترسل رسالة الخطأ جاهزة
       _showError(e.toString().contains('requires-recent-login')
           ? "لأمانك، يرجى تسجيل الخروج والدخول مجدداً لتغيير كلمة السر"
           : "حدث خطأ: $e");
@@ -133,8 +146,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final String currentUid = _authService.currentUserId;
 
     if (currentUid == 'unknown' || currentUid.isEmpty) {
-      _showGuestWarning(context); // إظهار الرسالة الجميلة
-      return; // التوقف هنا وعدم إكمال عملية الحفظ
+      _showGuestWarning(context);
+      return;
     }
     final String enteredEmail = _emailController.text.trim();
     final String enteredName = _nameController.text.trim();
@@ -194,6 +207,59 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: AppColors.error),
+      );
+      setState(() => _isSaving = false);
+    }
+  }
+
+  void _showGuestWarning(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        content: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(15),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              )
+            ],
+          ),
+          child: const Row(
+            children: [
+              Icon(Icons.lock_person_outlined, color: Colors.white),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text("عذراً، يجب تسجيل الدخول أولاً لتتمكن من حفظ بياناتك الشخصية",
+                  textAlign: TextAlign.right,
+                  style: TextStyle(
+                    fontFamily: 'Tajawal',
+                    fontSize: 14,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
+  }
+
+// ---------------------------------------------------------
+//  (خامسا) البناء للصفحه و استقبال الكود
+// ---------------------------------------------------------
   void _showOtpDialog() {
     _otpCode = ["", "", "", "", "", ""];
     showModalBottomSheet(
@@ -257,46 +323,22 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: AppColors.error),
-      );
-      setState(() => _isSaving = false);
-    }
-  }
-
-  @override
-  void dispose() {
-    _emailController.dispose();
-    _phoneController.dispose();
-    _nameController.dispose();
-    _passController.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     String provider = widget.loginProvider.toLowerCase().trim();
 
-    // "حزام أمان" إضافي: لو القيمة فاضية، نبحث عنها في الـ SharedPreferences داخل الـ build (اختياري)
-    // لكن الاعتماد على ما يرسله الناف بار بعد تعديله كافي.
-
     bool isEmailLocked = provider == 'email' || provider == 'google' || provider == 'password';
     bool isPhoneLocked = provider == 'phone';
 
-    print("Final Check - Provider: $provider | EmailLocked: $isEmailLocked | PhoneLocked: $isPhoneLocked");
     return Scaffold(
       extendBodyBehindAppBar: true,
-      // نصيحة: بما أننا أضفنا ناف بار، يفضل حذف زر الرجوع من الـ AppBar
-      // لأن التنقل سيكون عبر الناف بار، أو إبقاؤه حسب رغبتك.
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false, // حذف سهم الرجوع الافتراضي لتجنب الازدحام
       ),
       body: WavyBackground(
-        child: Stack( // أضفنا Stack هنا
+        child: Stack(
           children: [
             Center(
               child: _isLoading
@@ -383,10 +425,8 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
 
-            // إستدعاء الناف بار الموحد
-            // استدعاء الودجت الموحد الجديد في الهوم
             CustomFloatingNavBar(
-              currentIndex: 2, // رقم 1 يمثل الهوم
+              currentIndex: 2,
             ),
           ],
         ),
@@ -416,47 +456,6 @@ class _ProfilePageState extends State<ProfilePage> {
         const SizedBox(width: 8),
         Text("طريقة الدخول: $providerName", style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
       ],
-    );
-  }
-  void _showGuestWarning(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        content: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.primary, // اللون البنفسجي الأساسي
-            borderRadius: BorderRadius.circular(15),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              )
-            ],
-          ),
-          child: const Row(
-            children: [
-              Icon(Icons.lock_person_outlined, color: Colors.white),
-              SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  "عذراً، يجب تسجيل الدخول أولاً لتتمكن من حفظ بياناتك الشخصية",
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    fontFamily: 'Tajawal',
-                    fontSize: 14,
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        duration: const Duration(seconds: 3),
-      ),
     );
   }
 }
