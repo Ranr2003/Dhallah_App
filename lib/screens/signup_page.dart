@@ -48,7 +48,7 @@ class _SignUpPageState extends State<SignUpPage> {
   void _handleSignUp() async {
     if (_emailController.text.isEmpty ||_passwordController.text.isEmpty || _usernameController.text.isEmpty || _confirmPasswordController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")),
+        const SnackBar(content: Text("الرجاء تعبئة جميع الحقول"),backgroundColor: Colors.redAccent),
       );
       return;
     }

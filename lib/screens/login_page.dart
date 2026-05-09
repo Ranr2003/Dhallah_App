@@ -172,7 +172,7 @@ class _LoginPageState extends State<LoginPage> {
 
   void _handleLogin() async {
     if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول")));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("الرجاء تعبئة جميع الحقول"),backgroundColor: Colors.redAccent));
       return;
     }
     setState(() => _isLoading = true);
