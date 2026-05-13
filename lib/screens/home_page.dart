@@ -48,7 +48,7 @@ class _HomePageState extends State<HomePage> {
     final user = _authService.getCurrentUser();
     if (user != null) {
       if (mounted) setState(() => currentUid = user.uid);
-      await _dbService.saveFcmTokenIfNeeded(user.uid);
+      await _dbService.getAndSaveFcmToken(user.uid);
       RegularUser? userData = await _dbService.getUserById(user.uid);
       if (userData != null && mounted) {
         setState(() => userName = userData.name);
