@@ -6,6 +6,7 @@ class MessageModel {
   final String messageText;
   final DateTime timestamp;
   final bool isRead;
+  final String type; // 'text' or 'image'
 
   MessageModel({
     required this.senderId,
@@ -13,27 +14,29 @@ class MessageModel {
     required this.messageText,
     required this.timestamp,
     this.isRead = false,
+    this.type = 'text',
   });
 
-  // تحويل البيانات من JSON (Firebase) إلى Object (Flutter)
   factory MessageModel.fromMap(Map<String, dynamic> map) {
     return MessageModel(
       senderId: map['senderId'] ?? '',
       receiverId: map['receiverId'] ?? '',
       messageText: map['messageText'] ?? '',
-      timestamp: (map['timestamp'] as Timestamp).toDate(),
+      // معالجة الـ Timestamp لتجنب الانهيار إذا كان فارغاً
+      timestamp: (map['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
       isRead: map['isRead'] ?? false,
+      type: map['type'] ?? 'text',
     );
   }
 
-  // تحويل الـ Object إلى Map لإرساله لـ Firebase
   Map<String, dynamic> toMap() {
     return {
       'senderId': senderId,
       'receiverId': receiverId,
       'messageText': messageText,
-      'timestamp': timestamp,
+      'timestamp': FieldValue.serverTimestamp(), // يفضل استخدام وقت السيرفر
       'isRead': isRead,
+      'type': type,
     };
   }
 }
